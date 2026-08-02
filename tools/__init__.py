@@ -1,3 +1,5 @@
 """Tools registry and implementations package."""
 
-__all__: list[str] = []
+from tools.registry import ToolRegistry
+
+__all__ = ["ToolRegistry"]
