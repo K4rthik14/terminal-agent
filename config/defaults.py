@@ -6,3 +6,15 @@ Responsibilities:
 - Imported by modules that need stable system-level values.
 - No logic, no classes — constants only.
 """
+
+MAX_TOOL_RETRIES: int = 3
+TOOL_TIMEOUT_SECONDS: int = 30
+MAX_WEB_CONTENT_LENGTH: int = 5000
+MAX_ITERATIONS: int = 50
+DEFAULT_MODEL: str = "poolside/laguna-s-2.1:free"
+DEFAULT_BASE_URL: str = "https://openrouter.ai/api/v1"
+DEFAULT_PROVIDER: str = "openai"
+DEFAULT_LOG_LEVEL: str = "info"
+DEFAULT_APPROVAL_MODE: str = "auto"
+RESERVED_TOOL_NAMES: frozenset[str] = frozenset({"task"})
+AGENT_INSTRUCTIONS_FILE: str = "NANOCODE.md"
