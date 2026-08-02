@@ -6,3 +6,48 @@ Responsibilities:
 - Maps OpenAI response shapes back to internal types.
 - Never imported by agent core directly — injected via main.py factory.
 """
+
+from collections.abc import Iterator
+from typing import Any
+
+from openai import OpenAI
+
+from llm.base import LLMClient
+from llm.streaming import parse_openai_stream
+from utils.errors import LLMError
+from utils.types import MessageList, StreamEvent
+
+
+class OpenAIClient(LLMClient):
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        base_url: str | None = None,
+        max_tokens: int = 4096,
+    ):
+        self._model = model
+        self._max_tokens = max_tokens
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
+
+    def stream(
+        self,
+        messages: MessageList,
+        tool_schemas: list[dict[str, Any]],
+    ) -> Iterator[StreamEvent]:
+        """Stream a response from the OpenAI-compatible API, yielding StreamEvent objects."""
+        try:
+            kwargs: dict[str, Any] = dict(
+                model=self._model,
+                messages=messages,
+                max_tokens=self._max_tokens,
+                stream=True,
+            )
+            if tool_schemas:
+                kwargs["tools"] = tool_schemas
+
+            raw_stream = self._client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            raise LLMError(f"OpenAI API request failed: {exc}") from exc
+
+        yield from parse_openai_stream(raw_stream)
