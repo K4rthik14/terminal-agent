@@ -32,7 +32,9 @@ class OpenAIClient(LLMClient):
         self._model = model
         self._max_tokens = max_tokens
 
-        default_headers: dict[str, str] = {}
+        default_headers: dict[str, str] = {
+            "Authorization": f"Bearer {api_key}",
+        }
         if app_name:
             default_headers["X-Title"] = app_name
         if site_url:
