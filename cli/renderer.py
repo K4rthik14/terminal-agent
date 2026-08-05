@@ -13,8 +13,6 @@ import time
 from typing import Any
 
 from rich.console import Console
-from rich.text import Text
-
 console = Console()
 
 
@@ -38,8 +36,18 @@ class Renderer:
         console.print("[cyan]⠋ Thinking...[/]")
 
     def executing(self, tool_name: str, args: dict[str, Any]) -> float:
-        """Render a summarized tool card and return its start time."""
+        """Render a concise action state and return its start time."""
         summary = self._tool_summary(tool_name, args)
+        state = {
+            "write_file": "Creating File",
+            "edit_file": "Editing File",
+            "bash": "Running",
+            "read_file": "Reading File",
+            "web_search": "Searching Web",
+            "web_fetch": "Fetching Page",
+            "task": "Delegating",
+        }.get(tool_name, "Executing")
+        console.print(f"[cyan]⠋ {state}...[/]")
         icon = {
             "write_file": "📝",
             "edit_file": "📝",
@@ -82,9 +90,11 @@ class Renderer:
     @staticmethod
     def _tool_summary(tool_name: str, args: dict[str, Any]) -> str:
         if tool_name in {"write_file", "edit_file", "read_file"}:
-            return str(args.get("path", ""))
+            path = str(args.get("path", ""))
+            return os.path.relpath(path, os.getcwd()) if path else ""
         if tool_name == "bash":
-            return str(args.get("command", ""))
+            command = str(args.get("command", ""))
+            return command if len(command) <= 120 else f"{command[:117]}..."
         if tool_name == "web_search":
             return str(args.get("query", ""))
         if tool_name == "web_fetch":
