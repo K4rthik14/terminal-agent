@@ -12,6 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
+nanocode = "cli.main:main"
 agent = "cli.main:main"
 
 [build-system]

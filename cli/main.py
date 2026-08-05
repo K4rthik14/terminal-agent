@@ -45,14 +45,14 @@ def build_registry(settings: Settings, agent_factory) -> ToolRegistry:
     return registry
 
 
-def build_agent(settings: Settings, registry: ToolRegistry) -> Agent:
+def build_agent(settings: Settings, registry: ToolRegistry, renderer: Renderer | None = None) -> Agent:
     llm = OpenAIClient(
         api_key=settings.api_key,
         model=settings.model,
         base_url=settings.base_url,
         max_tokens=settings.max_tokens,
     )
-    return Agent(llm=llm, registry=registry, settings=settings)
+    return Agent(llm=llm, registry=registry, settings=settings, renderer=renderer)
 
 
 def resolve_settings(args: argparse.Namespace) -> Settings:
@@ -80,7 +80,7 @@ def resolve_settings(args: argparse.Namespace) -> Settings:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="agent",
+        prog="nanocode",
         description="nanocode — a terminal coding agent",
     )
     parser.add_argument("--model", default="", help="Override LLM model name")
@@ -94,7 +94,11 @@ def main() -> None:
     settings = resolve_settings(args)
     configure_logging(settings.log_level)
 
-    renderer = Renderer()
+    renderer = Renderer(
+        model=settings.model,
+        plan_mode=settings.plan_mode,
+        approval_mode=settings.approval_mode,
+    )
 
     if not settings.api_key:
         renderer.error("No API key found. Set AGENT_API_KEY or OPENROUTER_API_KEY.")
@@ -105,7 +109,7 @@ def main() -> None:
         return build_agent(settings, sub_registry)
 
     registry = build_registry(settings, agent_factory)
-    agent = build_agent(settings, registry)
+    agent = build_agent(settings, registry, renderer=renderer)
 
     if args.prompt:
         # Single-shot mode
