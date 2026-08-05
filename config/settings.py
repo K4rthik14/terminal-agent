@@ -8,6 +8,7 @@ Responsibilities:
 - CLI flag overrides are applied here after initial load.
 """
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from config.defaults import (
     DEFAULT_MODEL,
@@ -26,11 +27,19 @@ class Settings(BaseSettings):
     provider: str = DEFAULT_PROVIDER
     base_url: str = DEFAULT_BASE_URL
     model: str = DEFAULT_MODEL
-    api_key: str = ""           # AGENT_API_KEY — falls back to OPENROUTER_API_KEY in main.py
+    api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("AGENT_API_KEY", "OPENROUTER_API_KEY"),
+        repr=False,
+    )  # Never store or print API keys; supports both generic and OpenRouter names.
     max_tokens: int = 4096
     max_iterations: int = MAX_ITERATIONS
     max_web_content_length: int = MAX_WEB_CONTENT_LENGTH
     log_level: str = DEFAULT_LOG_LEVEL
     approval_mode: str = DEFAULT_APPROVAL_MODE   # "always" | "never" | "auto"
     plan_mode: bool = False
-    firecrawl_api_key: str = ""  # AGENT_FIRECRAWL_API_KEY — falls back to FIRECRAWL_API_KEY in main.py
+    firecrawl_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("AGENT_FIRECRAWL_API_KEY", "FIRECRAWL_API_KEY"),
+        repr=False,
+    )
