@@ -25,12 +25,21 @@ class Renderer:
         self._approval_mode = approval_mode
 
     def banner(self, model: str | None = None) -> None:
-        """Print a compact startup header."""
+        """Render a minimal startup banner."""
+
         model_label = model or self._model
-        console.print(f"[bold cyan]nanocode[/]   [dim]{model_label}[/] • [dim]{os.getcwd()}[/]")
-        console.print("[dim]────────────────────────────────────────────────────────────[/]")
-        plan = "ON" if self._plan_mode else "OFF"
-        console.print(f"[green]✓ Ready[/]  [dim]Plan: {plan}   Approval: {self._approval_mode.upper()}[/]\n")
+        cwd = os.path.basename(os.getcwd()) or os.getcwd()
+
+        console.print(
+            f"[bold cyan]nanocode[/] "
+            f"[dim]• {model_label} • {cwd}[/]"
+        )
+
+        console.print(
+            f"[green]✓ Ready[/]  "
+            f"[dim]Plan: {'ON' if self._plan_mode else 'OFF'}  "
+            f"Approval: {self._approval_mode.upper()}[/]\n"
+        )
 
     def thinking(self) -> None:
         console.print("[cyan]⠋ Thinking...[/]")
