@@ -12,6 +12,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from config.defaults import OPENROUTER_BASE_URL
 from llm.base import LLMClient
 from llm.streaming import parse_openai_stream
 from utils.errors import LLMError
@@ -23,12 +24,25 @@ class OpenAIClient(LLMClient):
         self,
         api_key: str,
         model: str,
-        base_url: str | None = None,
+        base_url: str | None = OPENROUTER_BASE_URL,
         max_tokens: int = 4096,
+        app_name: str | None = None,
+        site_url: str | None = None,
     ):
         self._model = model
         self._max_tokens = max_tokens
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
+
+        default_headers: dict[str, str] = {}
+        if app_name:
+            default_headers["X-Title"] = app_name
+        if site_url:
+            default_headers["HTTP-Referer"] = site_url
+
+        self._client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            default_headers=default_headers or None,
+        )
 
     def stream(
         self,
