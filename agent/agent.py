@@ -17,15 +17,23 @@ from agent.context import AgentContext
 from agent.approver import Approver
 from agent.executor import Executor
 from config.settings import Settings
+from cli.renderer import Renderer
 
 logger = get_logger(__name__)
 
 
 class Agent:
-    def __init__(self, llm: LLMClient, registry: ToolRegistry, settings: Settings) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        registry: ToolRegistry,
+        settings: Settings,
+        renderer: Renderer | None = None,
+    ) -> None:
         self._llm = llm
         self._registry = registry
         self._settings = settings
+        self._renderer = renderer or Renderer()
 
     def run(self, prompt: str, context: AgentContext | None = None) -> str:
         """
@@ -45,6 +53,7 @@ class Agent:
 
         reply = ""
         for _ in range(self._settings.max_iterations):
+            self._renderer.thinking()
             # Accumulate streaming response
             reply = ""
             tool_calls: list[ToolCall] = []
@@ -86,11 +95,19 @@ class Agent:
                 )
                 # Execute all tool calls and append results
                 for tc in tool_calls:
+                    try:
+                        args = json.loads(tc.arguments or "{}")
+                    except json.JSONDecodeError:
+                        args = {}
+                    started_at = self._renderer.executing(tc.name, args)
                     result = executor.run(tc)
+                    self._renderer.completed_tool(tc.name, not result.is_error, started_at)
                     context.add_tool_result(result.tool_call_id, result.content)
             else:
                 # Final reply — no more tool calls
                 context.add_assistant_message(content=reply)
+                self._renderer.completed()
                 return reply
 
+        self._renderer.completed()
         return reply
