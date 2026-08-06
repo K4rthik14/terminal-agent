@@ -9,6 +9,7 @@ from context.files import RelevantFileSelector
 from context.goal import GoalExtractor
 from context.models import ContextSelection, ContextState
 from context.prompt import PromptBuilder
+from context.scheduler import ToolScheduler
 from context.tools import RelevantToolSelector
 from tools.base import Tool
 
@@ -21,13 +22,14 @@ class PromptOrchestrator:
         max_messages: int = 24,
         goal_extractor: GoalExtractor | None = None,
         file_selector: RelevantFileSelector | None = None,
+        tool_scheduler: ToolScheduler | None = None,
         tool_selector: RelevantToolSelector | None = None,
         conversation_selector: ConversationSelector | None = None,
         prompt_builder: PromptBuilder | None = None,
     ) -> None:
         self._goals = goal_extractor or GoalExtractor()
         self._files = file_selector or RelevantFileSelector()
-        self._tools = tool_selector or RelevantToolSelector()
+        self._scheduler = tool_scheduler or ToolScheduler(selector=tool_selector)
         self._conversation = conversation_selector or ConversationSelector(max_messages)
         self._prompts = prompt_builder or PromptBuilder()
 
@@ -36,13 +38,13 @@ class PromptOrchestrator:
         tools = list(available_tools)
         goal = self._goals.extract(state)
         relevant_files = self._files.select(state)
-        selected_tools = self._tools.select(state, tools)
+        selected_tools = self._scheduler.schedule(state, tools)
         conversation = self._conversation.select(state)
         system_message = self._prompts.build_system_message(goal, relevant_files, state)
         messages = self._prompts.assemble(system_message, conversation)
         return ContextSelection(
             messages=messages,
-            tool_schemas=self._tools.schemas(selected_tools),
+            tool_schemas=self._scheduler.schemas(state, selected_tools),
             goal=goal,
             relevant_files=relevant_files,
             selected_tools=[tool.name for tool in selected_tools],

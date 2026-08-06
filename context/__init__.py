@@ -6,6 +6,7 @@ from context.loop import LoopDetector
 from context.manager import ContextManager
 from context.models import AgentState, ContextEvaluation, ContextSelection, ContextState
 from context.orchestrator import PromptOrchestrator
+from context.scheduler import ToolScheduler
 from context.window import MessageWindow
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "ContextSelection",
     "ContextState",
     "PromptOrchestrator",
+    "ToolScheduler",
     "MessageWindow",
 ]

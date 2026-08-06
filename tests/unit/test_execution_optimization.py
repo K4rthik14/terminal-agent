@@ -1,6 +1,11 @@
 """Unit tests for execution-loop safeguards."""
 
 from context.loop import LoopDetector
+from context.models import ContextState
+from context.scheduler import ToolScheduler
+from tools.bash import BashTool
+from tools.file_read import ReadFileTool
+from tools.file_write import WriteFileTool
 
 
 def test_loop_detector_blocks_repeated_identical_calls() -> None:
@@ -32,3 +37,21 @@ def test_loop_detector_reset_starts_a_new_workflow() -> None:
     detector.reset()
 
     assert detector.observe("read_file", {"path": "README.md"}) is False
+
+
+def test_tool_scheduler_exposes_relevant_tools_only() -> None:
+    state = ContextState(goal="Read README.md")
+    tools = [ReadFileTool(), WriteFileTool(), BashTool()]
+
+    scheduled = ToolScheduler().schedule(state, tools)
+
+    assert [tool.name for tool in scheduled] == ["read_file"]
+
+
+def test_tool_scheduler_preserves_available_tools_for_unknown_tasks() -> None:
+    state = ContextState(goal="Do something unusual")
+    tools = [ReadFileTool(), WriteFileTool(), BashTool()]
+
+    scheduled = ToolScheduler().schedule(state, tools)
+
+    assert [tool.name for tool in scheduled] == ["read_file", "write_file", "bash"]
