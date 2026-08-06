@@ -118,5 +118,8 @@ def test_context_evaluator_reports_selection_metrics() -> None:
 
     assert evaluation.message_count == 1
     assert evaluation.tool_count == 0
+    assert evaluation.system_message_present is True
+    assert evaluation.average_message_characters == 6.0
+    assert evaluation.character_budget_utilization > 0
     assert "context has no active goal" in evaluation.warnings
     assert "context has no available tools" in evaluation.warnings

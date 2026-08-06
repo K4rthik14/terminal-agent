@@ -52,4 +52,9 @@ class ContextEvaluation:
     tool_count: int
     character_count: int
     has_goal: bool
+    system_message_present: bool = False
+    relevant_file_count: int = 0
+    selected_tool_names: tuple[str, ...] = ()
+    average_message_characters: float = 0.0
+    character_budget_utilization: float = 0.0
     warnings: tuple[str, ...] = ()
