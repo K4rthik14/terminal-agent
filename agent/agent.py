@@ -52,8 +52,6 @@ class Agent:
 
         approver = Approver(ApprovalMode(self._settings.approval_mode))
         executor = Executor(self._registry, approver, plan_mode=context.plan_mode)
-        tool_schemas = self._registry.as_definitions()
-
         reply = ""
         for _ in range(self._settings.max_iterations):
             self._renderer.thinking()
@@ -62,8 +60,10 @@ class Agent:
             tool_calls: list[ToolCall] = []
             finish_reason = None
 
+            selection = context.select_context(self._registry.all())
+
             try:
-                for event in self._llm.stream(context.messages_for_llm(), tool_schemas):
+                for event in self._llm.stream(selection.messages, selection.tool_schemas):
                     if event.type == "token":
                         print(event.content, end="", flush=True)
                         reply += event.content

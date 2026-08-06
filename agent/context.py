@@ -12,7 +12,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from context.builder import ContextBuilder
+from context.manager import ContextManager
+from context.models import AgentState, ContextSelection
 from context.window import MessageWindow
+from tools.base import Tool
 from utils.types import MessageList
 
 
@@ -26,9 +29,11 @@ class AgentContext:
     max_context_messages: int = 24
     _builder: ContextBuilder = field(default_factory=ContextBuilder, repr=False)
     _window: MessageWindow = field(init=False, repr=False)
+    _manager: ContextManager = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._window = MessageWindow(self.max_context_messages)
+        self._manager = ContextManager(max_messages=self.max_context_messages)
 
     def add_user_message(self, content: str) -> None:
         self.messages.append({"role": "user", "content": content})
@@ -51,8 +56,13 @@ class AgentContext:
         return self._builder.build_system_prompt()
 
     def messages_for_llm(self) -> MessageList:
-        """Return only the relevant bounded context for the next model call."""
+        """Return a bounded context for compatibility with older callers."""
         return self._window.select(self.messages)
+
+    def select_context(self, tools: list[Tool]) -> ContextSelection:
+        """Build fresh messages and selected tools from the current agent state."""
+        state = AgentState(messages=self.messages, plan_mode=self.plan_mode)
+        return self._manager.build(state, tools)
 
     def init_system_message(self) -> None:
         """Prepend the system message once at session start."""
