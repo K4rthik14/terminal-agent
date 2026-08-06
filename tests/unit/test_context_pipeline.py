@@ -3,8 +3,10 @@
 from context.conversation import ConversationSelector
 from context.files import RelevantFileSelector
 from context.goal import GoalExtractor
+from context.evaluator import ContextEvaluator
 from context.manager import ContextManager
-from context.models import ContextState
+from context.models import ContextSelection, ContextState
+from context.orchestrator import PromptOrchestrator
 from context.tools import RelevantToolSelector
 from tools.bash import BashTool
 from tools.file_read import ReadFileTool
@@ -59,9 +61,8 @@ def test_file_selector_uses_active_hints_without_reading_history() -> None:
 
 def test_tool_selector_keeps_tools_relevant_to_goal() -> None:
     tools = [ReadFileTool(), WriteFileTool(), BashTool()]
-    state = ContextState()
-
-    selected = RelevantToolSelector().select("Create a file and run pytest", tools, state)
+    state = ContextState(goal="Create a file and run pytest")
+    selected = RelevantToolSelector().select(state, tools)
 
     assert [tool.name for tool in selected] == ["read_file", "write_file", "bash"]
 
@@ -91,3 +92,31 @@ def test_context_manager_builds_fresh_system_context() -> None:
     assert "Current task:" in selection.messages[0]["content"]
     assert "README.md" in selection.relevant_files
     assert selection.selected_tools == ["read_file"]
+
+
+def test_prompt_orchestrator_rebuilds_fresh_context() -> None:
+    state = ContextState(
+        goal="Read README.md",
+        conversation_tail=[{"role": "user", "content": "Read README.md"}],
+    )
+
+    selection = PromptOrchestrator().build(state, [ReadFileTool(), WriteFileTool()])
+
+    assert selection.messages[0]["role"] == "system"
+    assert selection.messages[0]["content"] != "stale system"
+    assert selection.selected_tools == ["read_file"]
+
+
+def test_context_evaluator_reports_selection_metrics() -> None:
+    selection = ContextSelection(
+        messages=[{"role": "system", "content": "system"}],
+        tool_schemas=[],
+        goal="",
+    )
+
+    evaluation = ContextEvaluator().evaluate(selection)
+
+    assert evaluation.message_count == 1
+    assert evaluation.tool_count == 0
+    assert "context has no active goal" in evaluation.warnings
+    assert "context has no available tools" in evaluation.warnings
