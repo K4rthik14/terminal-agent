@@ -37,12 +37,24 @@ def test_goal_extractor_compacts_long_goals() -> None:
 
 
 def test_file_selector_extracts_explicit_paths() -> None:
-    state = ContextState()
+    state = ContextState(goal="Update src/main.py and tests/test_main.py")
 
-    assert RelevantFileSelector().select("Update src/main.py and tests/test_main.py", state) == [
+    assert RelevantFileSelector().select(state) == [
         "src/main.py",
         "tests/test_main.py",
     ]
+
+
+def test_file_selector_uses_active_hints_without_reading_history() -> None:
+    state = ContextState(
+        goal="Review README.md",
+        active_files=("src/agent.py",),
+        conversation_tail=[
+            {"role": "user", "content": "Ignore unrelated.py"},
+        ],
+    )
+
+    assert RelevantFileSelector().select(state) == ["src/agent.py", "README.md"]
 
 
 def test_tool_selector_keeps_tools_relevant_to_goal() -> None:

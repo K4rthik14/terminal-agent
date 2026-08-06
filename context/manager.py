@@ -40,7 +40,7 @@ class ContextManager:
         state = self._normalize_state(state)
         tools = list(available_tools)
         goal = self._goals.extract(state)
-        relevant_files = self._files.select(goal, state)
+        relevant_files = self._files.select(state)
         selected_tools = self._tools.select(goal, tools, state)
         conversation = self._conversation.select(state)
         system_message = self._prompts.build_system_message(goal, relevant_files, state)

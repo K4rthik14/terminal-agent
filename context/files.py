@@ -17,18 +17,18 @@ class RelevantFileSelector:
         self._workspace = workspace or Path.cwd()
         self._max_files = max_files
 
-    def select(self, goal: str, state: ContextState) -> list[str]:
-        """Return unique file hints, preferring active files and explicit paths."""
-        selected: list[str] = list(state.active_files[: self._max_files])
-        text = "\n".join(
-            [goal]
-            + [str(message.get("content", "")) for message in state.conversation_tail]
-        )
-        for raw_path in _PATH_PATTERN.findall(text):
+    def select(self, state: ContextState) -> list[str]:
+        """Return lightweight file references relevant to the stored goal.
+
+        This method only parses path-like references and carries forward active
+        file hints. It never opens, stats, or otherwise loads file contents.
+        """
+        selected: list[str] = []
+        for raw_path in (*state.active_files, *_PATH_PATTERN.findall(state.goal)):
             path = Path(raw_path)
-            relative = str(path)
-            if relative not in selected:
-                selected.append(relative)
+            reference = str(path)
+            if reference not in selected:
+                selected.append(reference)
             if len(selected) >= self._max_files:
                 break
-        return selected
+        return selected[: self._max_files]
