@@ -13,7 +13,7 @@ from typing import Any
 
 from context.builder import ContextBuilder
 from context.manager import ContextManager
-from context.models import AgentState, ContextSelection
+from context.models import ContextSelection, ContextState
 from context.window import MessageWindow
 from tools.base import Tool
 from utils.types import MessageList
@@ -27,6 +27,7 @@ class AgentContext:
     plan_mode: bool = False
     auto_approve: bool = False
     max_context_messages: int = 24
+    iteration: int = 0
     _builder: ContextBuilder = field(default_factory=ContextBuilder, repr=False)
     _window: MessageWindow = field(init=False, repr=False)
     _manager: ContextManager = field(init=False, repr=False)
@@ -60,8 +61,29 @@ class AgentContext:
         return self._window.select(self.messages)
 
     def select_context(self, tools: list[Tool]) -> ContextSelection:
-        """Build fresh messages and selected tools from the current agent state."""
-        state = AgentState(messages=self.messages, plan_mode=self.plan_mode)
+        """Build fresh messages and selected tools from compact current state."""
+        conversation = [
+            message for message in self.messages if message.get("role") != "system"
+        ]
+        conversation_tail = self._window.select(conversation)
+        goal = next(
+            (
+                str(message.get("content", "")).strip()
+                for message in reversed(conversation_tail)
+                if message.get("role") == "user" and message.get("content")
+            ),
+            "",
+        )
+        state = ContextState(
+            goal=goal,
+            conversation_tail=conversation_tail,
+            recent_tool_results=tuple(
+                message for message in conversation_tail if message.get("role") == "tool"
+            ),
+            plan_mode=self.plan_mode,
+            iteration=self.iteration,
+        )
+        self.iteration += 1
         return self._manager.build(state, tools)
 
     def init_system_message(self) -> None:
