@@ -18,6 +18,7 @@ from agent.approver import Approver
 from agent.executor import Executor
 from config.settings import Settings
 from cli.renderer import Renderer
+from context.loop import LoopDetector
 
 logger = get_logger(__name__)
 
@@ -52,6 +53,7 @@ class Agent:
 
         approver = Approver(ApprovalMode(self._settings.approval_mode))
         executor = Executor(self._registry, approver, plan_mode=context.plan_mode)
+        loop_detector = LoopDetector()
         reply = ""
         for _ in range(self._settings.max_iterations):
             self._renderer.thinking()
@@ -103,6 +105,14 @@ class Agent:
                     except json.JSONDecodeError:
                         args = {}
                     started_at = self._renderer.executing(tc.name, args)
+                    if loop_detector.observe(tc.name, args):
+                        result_content = (
+                            "Repeated tool call blocked to prevent an execution loop. "
+                            "Try a different action or inspect the previous result."
+                        )
+                        self._renderer.completed_tool(tc.name, False, started_at)
+                        context.add_tool_result(tc.id, result_content)
+                        continue
                     result = executor.run(tc)
                     self._renderer.completed_tool(tc.name, not result.is_error, started_at)
                     context.add_tool_result(result.tool_call_id, result.content)
