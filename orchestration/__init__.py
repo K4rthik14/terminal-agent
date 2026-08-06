@@ -1,5 +1,6 @@
 """Local multi-agent orchestration package."""
 
+from orchestration.coordinator import MultiAgentCoordinator
 from orchestration.models import (
     AgentResult,
     AgentRole,
@@ -13,5 +14,6 @@ __all__ = [
     "AgentRole",
     "CoordinationResult",
     "DelegatedTask",
+    "MultiAgentCoordinator",
     "RoleRouter",
 ]
