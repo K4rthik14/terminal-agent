@@ -1,11 +1,26 @@
 """Unit tests for execution-loop safeguards."""
 
 from context.loop import LoopDetector
+from context.metrics import AgentRunMetrics
 from context.models import ContextState
 from context.scheduler import ToolScheduler
 from tools.bash import BashTool
 from tools.file_read import ReadFileTool
 from tools.file_write import WriteFileTool
+
+
+def test_run_metrics_records_execution_data() -> None:
+    metrics = AgentRunMetrics()
+
+    metrics.record_tool("read_file")
+    metrics.record_tool("read_file")
+    metrics.record_context(2, 100, 1)
+    metrics.finish(True)
+
+    assert metrics.success is True
+    assert metrics.execution_time >= 0
+    assert metrics.tool_usage == {"read_file": 2}
+    assert metrics.context_message_counts == [2]
 
 
 def test_loop_detector_blocks_repeated_identical_calls() -> None:

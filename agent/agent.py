@@ -19,6 +19,8 @@ from agent.executor import Executor
 from config.settings import Settings
 from cli.renderer import Renderer
 from context.loop import LoopDetector
+from context.metrics import AgentRunMetrics
+from context.window import MessageWindow
 
 logger = get_logger(__name__)
 
@@ -35,6 +37,7 @@ class Agent:
         self._registry = registry
         self._settings = settings
         self._renderer = renderer or Renderer()
+        self.last_run_metrics = AgentRunMetrics()
 
     def run(self, prompt: str, context: AgentContext | None = None) -> str:
         """
@@ -54,6 +57,8 @@ class Agent:
         approver = Approver(ApprovalMode(self._settings.approval_mode))
         executor = Executor(self._registry, approver, plan_mode=context.plan_mode)
         loop_detector = LoopDetector()
+        metrics = AgentRunMetrics()
+        self.last_run_metrics = metrics
         reply = ""
         for _ in range(self._settings.max_iterations):
             self._renderer.thinking()
@@ -63,6 +68,11 @@ class Agent:
             finish_reason = None
 
             selection = context.select_context(self._registry.all())
+            metrics.record_context(
+                message_count=len(selection.messages),
+                character_count=MessageWindow.estimate_characters(selection.messages),
+                tool_count=len(selection.tool_schemas),
+            )
 
             try:
                 for event in self._llm.stream(selection.messages, selection.tool_schemas):
@@ -81,6 +91,7 @@ class Agent:
                         finish_reason = event.finish_reason
             except LLMError as e:
                 print(f"\nLLM error: {e}")
+                metrics.finish(False)
                 return f"Error: {e}"
 
             print()  # newline after streaming
@@ -105,12 +116,14 @@ class Agent:
                     except json.JSONDecodeError:
                         args = {}
                     started_at = self._renderer.executing(tc.name, args)
+                    metrics.record_tool(tc.name)
                     if loop_detector.observe(tc.name, args):
                         result_content = (
                             "Repeated tool call blocked to prevent an execution loop. "
                             "Try a different action or inspect the previous result."
                         )
                         self._renderer.completed_tool(tc.name, False, started_at)
+                        metrics.loop_detection_events += 1
                         context.add_tool_result(tc.id, result_content)
                         continue
                     result = executor.run(tc)
@@ -120,7 +133,9 @@ class Agent:
                 # Final reply — no more tool calls
                 context.add_assistant_message(content=reply)
                 self._renderer.completed()
+                metrics.finish(True)
                 return reply
 
         self._renderer.completed()
+        metrics.finish(False)
         return reply
