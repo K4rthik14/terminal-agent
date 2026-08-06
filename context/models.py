@@ -1,4 +1,4 @@
-"""Data contracts for context selection."""
+"""Data contracts for state-driven context selection."""
 
 from __future__ import annotations
 
@@ -9,8 +9,25 @@ from utils.types import MessageList
 
 
 @dataclass(frozen=True)
+class ContextState:
+    """Compact state required to rebuild context for one model iteration.
+
+    This intentionally excludes the full session history. ``conversation_tail``
+    contains only the bounded message sequence needed to preserve the current
+    tool turn and recent user-visible context.
+    """
+
+    goal: str = ""
+    conversation_tail: MessageList = field(default_factory=list)
+    active_files: tuple[str, ...] = ()
+    recent_tool_results: tuple[dict[str, Any], ...] = ()
+    plan_mode: bool = False
+    iteration: int = 0
+
+
+@dataclass(frozen=True)
 class AgentState:
-    """Minimal immutable view of session state used by selectors."""
+    """Backward-compatible legacy state accepted by ContextManager."""
 
     messages: MessageList
     plan_mode: bool = False

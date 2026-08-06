@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from context.builder import ContextBuilder
-from context.models import AgentState
+from context.models import ContextState
 from utils.types import MessageList
 
 
@@ -17,7 +17,7 @@ class PromptBuilder:
         self,
         goal: str,
         relevant_files: list[str],
-        state: AgentState,
+        state: ContextState,
     ) -> dict[str, str]:
         """Return a new system message for the current request."""
         sections = [self._builder.build_system_prompt()]

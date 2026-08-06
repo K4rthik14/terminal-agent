@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from context.conversation import ConversationSelector
 from context.files import RelevantFileSelector
 from context.goal import GoalExtractor
-from context.models import AgentState, ContextSelection
+from context.models import AgentState, ContextSelection, ContextState
 from context.prompt import PromptBuilder
 from context.tools import RelevantToolSelector
 from tools.base import Tool
@@ -31,8 +31,13 @@ class ContextManager:
         self._conversation = conversation_selector or ConversationSelector(max_messages)
         self._prompts = prompt_builder or PromptBuilder()
 
-    def build(self, state: AgentState, available_tools: Iterable[Tool]) -> ContextSelection:
-        """Build a fresh, task-focused context from current agent state."""
+    def build(
+        self,
+        state: ContextState | AgentState,
+        available_tools: Iterable[Tool],
+    ) -> ContextSelection:
+        """Build a fresh context from compact state, with legacy normalization."""
+        state = self._normalize_state(state)
         tools = list(available_tools)
         goal = self._goals.extract(state)
         relevant_files = self._files.select(goal, state)
@@ -46,4 +51,25 @@ class ContextManager:
             goal=goal,
             relevant_files=relevant_files,
             selected_tools=[tool.name for tool in selected_tools],
+        )
+
+    @staticmethod
+    def _normalize_state(state: ContextState | AgentState) -> ContextState:
+        if isinstance(state, ContextState):
+            return state
+        messages = [message for message in state.messages if message.get("role") != "system"]
+        goal = next(
+            (
+                str(message.get("content", "")).strip()
+                for message in reversed(messages)
+                if message.get("role") == "user" and message.get("content")
+            ),
+            "",
+        )
+        tool_results = tuple(message for message in messages if message.get("role") == "tool")
+        return ContextState(
+            goal=goal,
+            conversation_tail=messages[-24:],
+            recent_tool_results=tool_results[-8:],
+            plan_mode=state.plan_mode,
         )

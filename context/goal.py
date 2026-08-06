@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from context.models import AgentState
+from context.models import ContextState
 
 
 class GoalExtractor:
-    """Extracts the latest user request as the active task goal."""
+    """Extracts the active goal from compact context state."""
 
-    def extract(self, state: AgentState) -> str:
-        """Return the newest non-empty user message."""
-        for message in reversed(state.messages):
-            if message.get("role") == "user" and message.get("content"):
-                return str(message["content"]).strip()
-        return ""
+    def extract(self, state: ContextState) -> str:
+        """Return the current goal without scanning the full session history."""
+        return state.goal.strip()
