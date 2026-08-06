@@ -30,6 +30,15 @@ def test_loop_detector_allows_valid_different_steps() -> None:
     assert detector.observe("bash", {"command": "pytest"}) is False
 
 
+def test_loop_detector_allows_reread_after_another_tool() -> None:
+    detector = LoopDetector(max_repeats=2)
+
+    detector.observe("read_file", {"path": "main.py"})
+    detector.observe("edit_file", {"path": "main.py"})
+
+    assert detector.observe("read_file", {"path": "main.py"}) is False
+
+
 def test_loop_detector_reset_starts_a_new_workflow() -> None:
     detector = LoopDetector(max_repeats=2)
 

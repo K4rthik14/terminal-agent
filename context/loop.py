@@ -31,7 +31,12 @@ class LoopDetector:
     def observe(self, name: str, arguments: Mapping[str, Any] | str | None = None) -> bool:
         """Record a call and return whether it should be blocked as repetitive."""
         invocation = ToolInvocation(name=name, arguments=self._canonicalize(arguments))
-        repeated = sum(item == invocation for item in self._history) >= self._max_repeats - 1
+        consecutive = 0
+        for previous in reversed(self._history):
+            if previous != invocation:
+                break
+            consecutive += 1
+        repeated = consecutive >= self._max_repeats - 1
         self._history.append(invocation)
         return repeated
 
