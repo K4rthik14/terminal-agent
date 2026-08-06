@@ -42,7 +42,10 @@ class Agent:
         If context is provided, the prompt is appended and the session continues.
         """
         if context is None:
-            context = AgentContext(plan_mode=self._settings.plan_mode)
+            context = AgentContext(
+                plan_mode=self._settings.plan_mode,
+                max_context_messages=self._settings.max_context_messages,
+            )
             context.init_system_message()
 
         context.add_user_message(prompt)
@@ -60,7 +63,7 @@ class Agent:
             finish_reason = None
 
             try:
-                for event in self._llm.stream(context.messages, tool_schemas):
+                for event in self._llm.stream(context.messages_for_llm(), tool_schemas):
                     if event.type == "token":
                         print(event.content, end="", flush=True)
                         reply += event.content

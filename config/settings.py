@@ -18,6 +18,7 @@ from config.defaults import (
     DEFAULT_APPROVAL_MODE,
     MAX_ITERATIONS,
     MAX_WEB_CONTENT_LENGTH,
+    MAX_CONTEXT_MESSAGES,
 )
 
 
@@ -34,6 +35,7 @@ class Settings(BaseSettings):
     )  # Never store or print API keys; supports both generic and OpenRouter names.
     max_tokens: int = 4096
     max_iterations: int = MAX_ITERATIONS
+    max_context_messages: int = MAX_CONTEXT_MESSAGES
     max_web_content_length: int = MAX_WEB_CONTENT_LENGTH
     log_level: str = DEFAULT_LOG_LEVEL
     approval_mode: str = DEFAULT_APPROVAL_MODE   # "always" | "never" | "auto"

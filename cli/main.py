@@ -113,12 +113,18 @@ def main() -> None:
 
     if args.prompt:
         # Single-shot mode
-        context = AgentContext(plan_mode=settings.plan_mode)
+        context = AgentContext(
+            plan_mode=settings.plan_mode,
+            max_context_messages=settings.max_context_messages,
+        )
         context.init_system_message()
         agent.run(args.prompt, context=context)
     else:
         # Interactive REPL
-        context = AgentContext(plan_mode=settings.plan_mode)
+        context = AgentContext(
+            plan_mode=settings.plan_mode,
+            max_context_messages=settings.max_context_messages,
+        )
         context.init_system_message()
         repl = Repl(agent=agent, context=context, renderer=renderer)
         repl.run()
