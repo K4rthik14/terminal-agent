@@ -42,3 +42,14 @@ class ContextSelection:
     goal: str
     relevant_files: list[str] = field(default_factory=list)
     selected_tools: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ContextEvaluation:
+    """Lightweight diagnostics for a selected model context."""
+
+    message_count: int
+    tool_count: int
+    character_count: int
+    has_goal: bool
+    warnings: tuple[str, ...] = ()

@@ -23,10 +23,10 @@ class RelevantToolSelector:
         "task": ("delegate", "sub-agent", "parallel"),
     }
 
-    def select(self, goal: str, tools: Iterable[Tool], state: ContextState) -> list[Tool]:
-        """Return tools relevant to the current goal in registry order."""
+    def select(self, state: ContextState, tools: Iterable[Tool]) -> list[Tool]:
+        """Return tools relevant to the stored goal in registry order."""
         haystack = " ".join(
-            [goal.lower()]
+            [state.goal.lower()]
             + [str(message.get("content", "")).lower() for message in state.conversation_tail]
         )
         available = list(tools)
