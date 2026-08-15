@@ -8,7 +8,7 @@ Responsibilities:
 """
 
 import json
-from utils.types import ToolCall, MessageList, ApprovalMode
+from utils.types import ApprovalMode, ToolCall
 from utils.errors import LLMError
 from utils.logging import get_logger
 from llm.base import LLMClient
@@ -21,6 +21,7 @@ from cli.renderer import Renderer
 from context.loop import LoopDetector
 from context.metrics import AgentRunMetrics
 from context.window import MessageWindow
+from verification.verifier import Verifier
 
 logger = get_logger(__name__)
 
@@ -32,11 +33,15 @@ class Agent:
         registry: ToolRegistry,
         settings: Settings,
         renderer: Renderer | None = None,
+        verifier: Verifier | None = None,
+        verification_command: str = "",
     ) -> None:
         self._llm = llm
         self._registry = registry
         self._settings = settings
         self._renderer = renderer or Renderer()
+        self._verifier = verifier
+        self._verification_command = verification_command
         self.last_run_metrics = AgentRunMetrics()
 
     def run(self, prompt: str, context: AgentContext | None = None) -> str:
@@ -130,6 +135,25 @@ class Agent:
                     self._renderer.completed_tool(tc.name, not result.is_error, started_at)
                     context.add_tool_result(result.tool_call_id, result.content)
             else:
+                # A configured verifier turns a candidate final reply into a
+                # deterministic check-and-repair turn. No command means the
+                # historical behavior: finish immediately.
+                if self._verifier is not None and self._verification_command.strip():
+                    verification = self._verifier.verify_test(self._verification_command)
+                    metrics.record_verification(
+                        verification.passed,
+                        error=verification.error is not None or verification.timed_out,
+                    )
+                    if not verification.passed:
+                        detail = verification.error or verification.output or "verification failed"
+                        detail = " ".join(detail.split())[:2000]
+                        context.add_assistant_message(content=reply)
+                        context.add_tool_result(
+                            "verification",
+                            f"Verification failed for the configured check: {detail}. "
+                            "Repair the task and try again.",
+                        )
+                        continue
                 # Final reply — no more tool calls
                 context.add_assistant_message(content=reply)
                 self._renderer.completed()

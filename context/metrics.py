@@ -17,6 +17,10 @@ class AgentRunMetrics:
     context_message_counts: list[int] = field(default_factory=list)
     context_character_counts: list[int] = field(default_factory=list)
     context_tool_counts: list[int] = field(default_factory=list)
+    verification_attempts: int = 0
+    verification_passes: int = 0
+    verification_failures: int = 0
+    verification_errors: int = 0
     _started_at: float = field(default_factory=time.monotonic, repr=False)
 
     def finish(self, success: bool) -> None:
@@ -33,3 +37,13 @@ class AgentRunMetrics:
         self.context_message_counts.append(message_count)
         self.context_character_counts.append(character_count)
         self.context_tool_counts.append(tool_count)
+
+    def record_verification(self, passed: bool, error: bool = False) -> None:
+        """Record one deterministic verification attempt."""
+        self.verification_attempts += 1
+        if passed:
+            self.verification_passes += 1
+        else:
+            self.verification_failures += 1
+        if error:
+            self.verification_errors += 1
