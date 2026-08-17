@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/llm-inference-batching-scheduler",
+        "ref": "sha256:432477001faea62e41069e161634f54b35f0bda5077a50470bd89447a342e231",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "llm-inference-batching-scheduler__AVk2VFL",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

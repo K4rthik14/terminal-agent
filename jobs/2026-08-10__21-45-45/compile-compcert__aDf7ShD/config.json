@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/compile-compcert",
+        "ref": "sha256:59b8bdc7ad56243291afbc14cc1947d996db745a488ac018be4936643a47a999",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "compile-compcert__aDf7ShD",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

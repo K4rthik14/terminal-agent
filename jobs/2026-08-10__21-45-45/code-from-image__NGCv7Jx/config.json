@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/code-from-image",
+        "ref": "sha256:6b96c7a7eefcf3e655db93ac5e5278c1d6f0b98c9bf47c2ba03c53e5f157f132",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "code-from-image__NGCv7Jx",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

@@ -1,0 +1,5 @@
+Skipping image OS validation for alexgshaw/git-multibranch:20251031: docker inspect returned 1
+Trial git-multibranch__mWdvT5B failed: Docker compose command failed for environment git-multibranch. Command: docker compose --project-name git-multibranch__mwdvt5b__env --project-directory /home/karthik/.cache/harbor/tasks/packages/terminal-bench/git-multibranch/03d8f235cc737efc32ed92a11685f93581fe6e1fd4ad14fffaa049d2b59e381a/environment -f /tmp/tmp717rmb56/git-multibranch__mWdvT5B__env-docker-compose-resources.json -f /home/karthik/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/environments/docker/docker-compose-prebuilt.yaml -f /tmp/tmpu4w4nd5n/docker-compose-environment.json -f /tmp/tmpg9d_dugl/docker-compose-mounts.json up --detach --wait. Return code: 1. Stdout:  Image alexgshaw/git-multibranch:20251031 Pulling 
+failed to copy: httpReadSeeker: failed open: failed to do request: Get "https://registry-1.docker.io/v2/alexgshaw/git-multibranch/manifests/sha256:5bc449921c138295f6ddd8dca2977319fee2ce523811dbe56cec4ca663385fb5": dial tcp 50.16.220.42:443: i/o timeout
+. Stderr: None. 
+Collecting main service artifacts

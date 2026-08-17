@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/feal-differential-cryptanalysis",
+        "ref": "sha256:1950b3d2d670a51d83c45394b25450450293b4d15baa133a1490af14b984f149",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "feal-differential-cryptanalysis__pHjBiNX",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

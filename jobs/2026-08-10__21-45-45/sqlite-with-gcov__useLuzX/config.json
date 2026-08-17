@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/sqlite-with-gcov",
+        "ref": "sha256:b5d64900c45ffba80c48fcfaac97485662de684392f6e1b730f1cc934c28ff2b",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "sqlite-with-gcov__useLuzX",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

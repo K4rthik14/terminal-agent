@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/multi-source-data-merger",
+        "ref": "sha256:3f7ecbb6adc066596d40bb6b98e64e0e1f25eac542dcf5d47fa8bde65df92c5e",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "multi-source-data-merger__5r4z5HG",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

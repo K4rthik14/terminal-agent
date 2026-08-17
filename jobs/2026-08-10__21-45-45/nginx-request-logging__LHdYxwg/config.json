@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/nginx-request-logging",
+        "ref": "sha256:f5eaf57c493462fbeaa8a7b5c4155739ee4ce8e8fab037eae6512788885014f6",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "nginx-request-logging__LHdYxwg",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

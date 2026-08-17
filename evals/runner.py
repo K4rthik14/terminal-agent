@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -38,15 +39,28 @@ def run_task(task: dict[str, object], agent_factory: AgentFactory) -> dict[str, 
     original_cwd = os.getcwd()
     try:
         os.chdir(workspace)
+        started_at = time.monotonic()
         agent_error = None
         try:
             agent_factory().run(str(task["prompt"]))
         except Exception as exc:  # keep the eval going even if the agent crashes
             agent_error = str(exc)
-        passed, detail = judge.check(str(task["verification_command"]))
-        record: dict[str, object] = {"id": task["id"], "passed": passed, "detail": detail}
+        passed, detail, failure_type = judge.check_result(str(task["verification_command"]))
+        duration_seconds = round(time.monotonic() - started_at, 3)
+        if agent_error is not None:
+            passed = False
+            detail = agent_error
+            failure_type = "llm_error"
+        record: dict[str, object] = {
+            "id": task["id"],
+            "passed": passed,
+            "detail": detail,
+            "duration_seconds": duration_seconds,
+        }
         if agent_error is not None:
             record["agent_error"] = agent_error
+        if not passed:
+            record["failure_type"] = failure_type or "unknown_failure"
         return record
     finally:
         os.chdir(original_cwd)

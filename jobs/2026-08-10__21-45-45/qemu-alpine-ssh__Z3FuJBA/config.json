@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/qemu-alpine-ssh",
+        "ref": "sha256:5acce5eb7a7bde7918a1ccb4fd7421f4c19f7a9d1bad30b7d77951dc31e32800",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "qemu-alpine-ssh__Z3FuJBA",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

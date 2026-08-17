@@ -1,0 +1,29 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1786385445.7808084,
+            "stop": 1786385450.7949305
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_stolen_matrix_matches",
+                "status": "passed",
+                "duration": 4.720108008001262,
+                "start": 1786385446.0744405,
+                "stop": 1786385450.7947838,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            }
+        ]
+    }
+}

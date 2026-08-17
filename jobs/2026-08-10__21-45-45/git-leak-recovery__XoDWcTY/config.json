@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/git-leak-recovery",
+        "ref": "sha256:7b3743dde329a33de3e684b3490b09077d403f6a9795684e3e8828471e2abf49",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "git-leak-recovery__XoDWcTY",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

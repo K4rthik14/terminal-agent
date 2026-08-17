@@ -1,0 +1,3 @@
+Skipping image OS validation for alexgshaw/torch-tensor-parallelism:20251031: docker inspect returned 1
+Collecting main service artifacts
+Trial torch-tensor-parallelism__sWwxVsg failed: Verifier execution timed out after 900.0 seconds

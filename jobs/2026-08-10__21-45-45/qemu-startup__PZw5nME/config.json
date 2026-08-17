@@ -1,0 +1,10 @@
+{
+    "task": {
+        "name": "terminal-bench/qemu-startup",
+        "ref": "sha256:e9796833ca178d98500b4146d107d947226485065f5a79a1dff2cdf7430f4f95",
+        "source": "terminal-bench/terminal-bench-2"
+    },
+    "trial_name": "qemu-startup__PZw5nME",
+    "trials_dir": "jobs/2026-08-10__21-45-45",
+    "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+}

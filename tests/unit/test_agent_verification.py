@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 from agent.agent import Agent
 
+from tools.base import Tool
 from tools.registry import ToolRegistry
-from utils.types import StreamEvent
+from utils.types import StreamEvent, ToolResult
 
 
 class FakeLLM:
@@ -39,6 +40,37 @@ def settings(max_iterations: int = 4):
 
 def done(text: str = "done") -> list[StreamEvent]:
     return [StreamEvent(type="token", content=text), StreamEvent(type="done", finish_reason="stop")]
+
+
+def tool_call_done(name: str, call_id: str, args: str, text: str = "") -> list[StreamEvent]:
+    """Stream a single tool call: optional preamble text, the call, then done."""
+    events = [StreamEvent(type="token", content=text)] if text else []
+    events.append(
+        StreamEvent(
+            type="tool_call_delta",
+            tool_call_index=0,
+            tool_call_id=call_id,
+            tool_call_name=name,
+            content=args,
+        )
+    )
+    events.append(StreamEvent(type="done", finish_reason="tool_calls"))
+    return events
+
+
+class RecordingTool(Tool):
+    """Deterministic stand-in for a write tool that records its calls."""
+
+    name = "write_file"
+    description = "Write a file"
+    parameters = {"type": "object", "properties": {"path": {"type": "string"}}}
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def run(self, args: dict) -> ToolResult:
+        self.calls.append(args)
+        return ToolResult(tool_call_id="", content=f"wrote {args.get('path')}")
 
 
 def result(passed: bool, *, error: str | None = None, timed_out: bool = False):
@@ -110,3 +142,84 @@ def test_verification_timeout_is_safe_and_repairable() -> None:
 
     assert agent.run("fix it") == "complete"
     assert agent.last_run_metrics.verification_errors == 1
+
+
+def test_end_to_end_tool_execution_failure_repair_and_pass() -> None:
+    """Full loop: tool call -> tool result -> candidate reply -> failed check -> repair -> pass."""
+    tool = RecordingTool()
+    registry = ToolRegistry()
+    registry.register(tool)
+
+    llm = FakeLLM(
+        [
+            tool_call_done("write_file", "call_1", '{"path": "test_x.py"}', text="Let me fix it."),
+            done("candidate fix"),
+            done("proper fix applied"),
+        ]
+    )
+    verifier = FakeVerifier([result(False, error="1 failed"), result(True)])
+    agent = Agent(llm, registry, settings(), verifier=verifier, verification_command="pytest -q")
+
+    reply = agent.run("fix the failing test")
+
+    assert reply == "proper fix applied"
+    assert tool.calls == [{"path": "test_x.py"}]
+    assert len(llm.requests) == 3
+
+    # The executed tool result reached the model before the first check.
+    second_messages = llm.requests[1][0]
+    assert any(
+        message.get("role") == "tool" and "wrote test_x.py" in str(message.get("content"))
+        for message in second_messages
+    )
+
+    # The verification failure reached the model for the repair turn.
+    third_messages = llm.requests[2][0]
+    assert any("Verification failed" in str(message.get("content")) for message in third_messages)
+
+    metrics = agent.last_run_metrics
+    assert metrics.success is True
+    assert metrics.verification_attempts == 2
+    assert metrics.verification_failures == 1
+    assert metrics.verification_passes == 1
+    assert metrics.verification_errors == 1
+    assert metrics.tool_usage == {"write_file": 1}
+
+
+def test_no_verifier_preserves_immediate_completion() -> None:
+    llm = FakeLLM([done()])
+    agent = Agent(llm, ToolRegistry(), settings())
+
+    assert agent.run("fix it") == "done"
+    assert len(llm.requests) == 1
+    assert agent.last_run_metrics.success is True
+    assert agent.last_run_metrics.verification_attempts == 0
+
+
+def test_whitespace_verification_command_is_disabled() -> None:
+    llm = FakeLLM([done()])
+    verifier = FakeVerifier([result(False, error="must not run")])
+    agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="   ")
+
+    assert agent.run("fix it") == "done"
+    assert verifier.commands == []
+    assert agent.last_run_metrics.verification_attempts == 0
+
+
+def test_failed_check_uses_output_detail_when_no_error_reaches_model() -> None:
+    from verification.models import VerificationResult
+
+    llm = FakeLLM([done("candidate"), done("repaired")])
+    failed = VerificationResult(
+        passed=False,
+        check="test",
+        command="pytest -q",
+        output="tests failed badly",
+    )
+    verifier = FakeVerifier([failed, result(True)])
+    agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="pytest -q")
+
+    assert agent.run("fix it") == "repaired"
+    second_messages = llm.requests[1][0]
+    assert any("tests failed badly" in str(message.get("content")) for message in second_messages)
+    assert agent.last_run_metrics.verification_failures == 1

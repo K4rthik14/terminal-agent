@@ -2,6 +2,8 @@
 
 import subprocess
 
+import pytest
+
 from verification.verifier import Verifier
 
 
@@ -59,3 +61,39 @@ def test_verify_command_supports_injected_runner() -> None:
 
     assert result.passed is True
     assert result.output == "injected"
+
+
+def test_verify_command_reports_oserror() -> None:
+    def failing_runner(command: str, timeout_seconds: int) -> subprocess.CompletedProcess[str]:
+        raise OSError("command not found")
+
+    result = Verifier(command_runner=failing_runner).verify_command("missing-tool")
+
+    assert result.passed is False
+    assert result.error == "command not found"
+
+
+def test_verify_command_timeout_combines_stdout_and_stderr() -> None:
+    def timeout_runner(command: str, timeout_seconds: int) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(
+            command, timeout_seconds, output=b"partial-out", stderr=b"partial-err"
+        )
+
+    result = Verifier(timeout_seconds=1, command_runner=timeout_runner).verify_command("slow")
+
+    assert result.passed is False
+    assert result.timed_out is True
+    assert result.output == "partial-out\npartial-err"
+
+
+def test_verifier_rejects_non_positive_timeout() -> None:
+    with pytest.raises(ValueError):
+        Verifier(timeout_seconds=0)
+
+
+def test_verify_test_rejects_empty_command() -> None:
+    result = Verifier().verify_test("   ")
+
+    assert result.passed is False
+    assert result.check == "test"
+    assert result.error == "Verification command cannot be empty."

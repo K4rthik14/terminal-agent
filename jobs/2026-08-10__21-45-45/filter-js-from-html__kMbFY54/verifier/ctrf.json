@@ -1,0 +1,38 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1786385880.2051256,
+            "stop": 1786386064.284753
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_filter_blocks_xss",
+                "status": "passed",
+                "duration": 182.90085959499993,
+                "start": 1786385880.4571795,
+                "stop": 1786386063.3822136,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_clean_html_unchanged",
+                "status": "passed",
+                "duration": 0.8867093179997028,
+                "start": 1786386063.3941932,
+                "stop": 1786386064.2816267,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            }
+        ]
+    }
+}

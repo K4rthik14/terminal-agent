@@ -1,0 +1,112 @@
+{
+    "id": "fe33f6af-bc04-4a7f-9a04-96b1d549ef75",
+    "task_name": "terminal-bench/video-processing",
+    "trial_name": "video-processing__qTPvda4",
+    "trial_uri": "file:///home/karthik/Documents/Codes/terminal-agent/jobs/2026-08-10__21-45-45/video-processing__qTPvda4",
+    "task_id": {
+        "org": "terminal-bench",
+        "name": "video-processing",
+        "ref": "sha256:59730f0ccdc323eb45aa433d094cd7c2f29a0084d3670ce7cc93acee9b516ade"
+    },
+    "source": "terminal-bench/terminal-bench-2",
+    "task_checksum": "a09d41da0822cc6467ba7ee3631fd205130acb0008d8488b44084b0864ee499f",
+    "config": {
+        "task": {
+            "path": null,
+            "git_url": null,
+            "git_commit_id": null,
+            "name": "terminal-bench/video-processing",
+            "ref": "sha256:59730f0ccdc323eb45aa433d094cd7c2f29a0084d3670ce7cc93acee9b516ade",
+            "overwrite": false,
+            "download_dir": null,
+            "source": "terminal-bench/terminal-bench-2"
+        },
+        "trial_name": "video-processing__qTPvda4",
+        "trials_dir": "jobs/2026-08-10__21-45-45",
+        "install_only": false,
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": "oracle",
+            "import_path": null,
+            "model_name": null,
+            "n_concurrent": null,
+            "concurrency_group": null,
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "resume_trajectory": false,
+            "load_trajectory": null,
+            "extra_allowed_hosts": [],
+            "kwargs": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "cpu_enforcement_policy": "auto",
+            "memory_enforcement_policy": "auto",
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "override_tpu": null,
+            "mounts": null,
+            "extra_docker_compose": [],
+            "kwargs": {},
+            "extra_allowed_hosts": []
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "d5ecb60f-3908-452d-b45d-8e086407e5a5"
+    },
+    "agent_info": {
+        "name": "oracle",
+        "version": "1.0.0",
+        "model_info": null
+    },
+    "agent_result": {
+        "n_input_tokens": null,
+        "n_cache_tokens": null,
+        "n_output_tokens": null,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": null
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 1.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-08-10T16:18:19.890596Z",
+    "finished_at": "2026-08-10T16:22:56.504844Z",
+    "environment_setup": {
+        "started_at": "2026-08-10T16:18:19.894418Z",
+        "finished_at": "2026-08-10T16:21:36.235390Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-08-10T16:21:36.235411Z",
+        "finished_at": "2026-08-10T16:21:36.235446Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-08-10T16:21:36.235498Z",
+        "finished_at": "2026-08-10T16:21:36.412307Z"
+    },
+    "verifier": {
+        "started_at": "2026-08-10T16:21:36.656122Z",
+        "finished_at": "2026-08-10T16:22:45.696308Z"
+    },
+    "step_results": null
+}

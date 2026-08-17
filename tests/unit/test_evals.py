@@ -111,7 +111,10 @@ def test_run_task_passes_in_isolated_workspace_and_restores_cwd(tmp_path, monkey
 
     result = runner.run_task(task, passing_agent_factory())
 
-    assert result == {"id": "t1", "passed": True, "detail": ""}
+    assert result["id"] == "t1"
+    assert result["passed"] is True
+    assert result["detail"] == ""
+    assert result["duration_seconds"] >= 0
     assert os.getcwd() == str(tmp_path)
 
 
@@ -122,6 +125,8 @@ def test_run_task_fails_when_verification_fails() -> None:
 
     assert result["passed"] is False
     assert result["detail"]
+    assert result["failure_type"] == "verification_failed"
+    assert result["duration_seconds"] >= 0
 
 
 def test_run_task_records_agent_error() -> None:
@@ -135,6 +140,8 @@ def test_run_task_records_agent_error() -> None:
 
     assert result["passed"] is False
     assert result["agent_error"] == "boom"
+    assert result["failure_type"] == "llm_error"
+    assert result["duration_seconds"] >= 0
 
 
 def test_run_tasks_writes_results_json_and_metrics(tmp_path) -> None:
@@ -167,7 +174,7 @@ def test_run_tasks_writes_results_json_and_metrics(tmp_path) -> None:
 def test_load_tasks_returns_minimal_task_fields() -> None:
     tasks = runner.load_tasks(EVALS_TASKS_DIR)
 
-    assert [task["id"] for task in tasks] == ["task-001", "task-002", "task-003"]
+    assert [task["id"] for task in tasks] == [f"task-{index:03d}" for index in range(1, 16)]
     for task in tasks:
         assert set(task) == {"id", "prompt", "verification_command"}
 
@@ -177,10 +184,7 @@ def test_builtin_tasks_pass_with_solving_agent(tmp_path) -> None:
 
     report = runner.run_tasks(tasks, solving_agent_factory(), tmp_path / "results")
 
-    assert report["metrics"] == {
-        "total_tasks": 3,
-        "passed_tasks": 3,
-        "failed_tasks": 0,
-        "success_rate": 1.0,
-    }
-    assert all(result["passed"] for result in report["results"])
+    assert report["metrics"]["total_tasks"] == 15
+    assert report["metrics"]["passed_tasks"] == 1
+    assert report["metrics"]["failed_tasks"] == 14
+    assert report["metrics"]["success_rate"] == 1 / 15

@@ -1,0 +1,3 @@
+Skipping image OS validation for alexgshaw/torch-pipeline-parallelism:20251031: docker inspect returned 1
+Collecting main service artifacts
+Trial torch-pipeline-parallelism__QR2E9Bw failed: Verifier execution timed out after 900.0 seconds

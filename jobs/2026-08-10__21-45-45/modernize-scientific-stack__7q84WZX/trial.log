@@ -1,0 +1,3 @@
+Skipping image OS validation for alexgshaw/modernize-scientific-stack:20251031: docker inspect returned 1
+Trial modernize-scientific-stack__7q84WZX failed: Environment start timed out after 600.0 seconds
+Collecting main service artifacts
