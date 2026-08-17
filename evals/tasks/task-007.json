@@ -1,0 +1,5 @@
+{
+  "id": "task-007",
+  "prompt": "Create greeting.py with greet(name) returning `Hello, {name}!`, and create a pytest test that expects greet('Ada') to equal `Hello, Ada!`. Make the implementation pass the test.",
+  "verification_command": "pytest -q"
+}

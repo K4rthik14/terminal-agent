@@ -1,0 +1,5 @@
+{
+  "id": "task-011",
+  "prompt": "Create config.ini with a [server] section and port=8000, then change only the port value to 8080.",
+  "verification_command": "grep -q '^\\[server\\]$' config.ini && grep -q '^port=8080$' config.ini && ! grep -q '^port=8000$' config.ini"
+}

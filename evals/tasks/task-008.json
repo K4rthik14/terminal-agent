@@ -1,0 +1,5 @@
+{
+  "id": "task-008",
+  "prompt": "Create package directory app with __init__.py and config.py. Define APP_NAME = 'terminal-agent' in config.py and re-export it from app/__init__.py.",
+  "verification_command": "test \"$(python3 -c 'from app import APP_NAME; print(APP_NAME)')\" = terminal-agent"
+}

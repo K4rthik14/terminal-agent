@@ -1,0 +1,5 @@
+{
+  "id": "task-010",
+  "prompt": "Create repeat.py with duplicated formatting logic, then refactor it into a single function format_name(first, last) that returns `last, first` while preserving that behavior.",
+  "verification_command": "test \"$(python3 -c 'from repeat import format_name; print(format_name(\"Ada\", \"Lovelace\"))')\" = 'Lovelace, Ada' && grep -q 'def format_name' repeat.py"
+}

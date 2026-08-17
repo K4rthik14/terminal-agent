@@ -1,5 +1,5 @@
 {
   "id": "task-002",
-  "prompt": "Create a directory named src and inside it a file README.md whose first line is: # my-project",
-  "verification_command": "test -f src/README.md && grep -qx '# my-project' src/README.md"
+  "prompt": "Create a file named settings.txt containing the line mode=old, then modify it so the line is exactly mode=new",
+  "verification_command": "test -f settings.txt && grep -qx 'mode=new' settings.txt && ! grep -q 'mode=old' settings.txt"
 }

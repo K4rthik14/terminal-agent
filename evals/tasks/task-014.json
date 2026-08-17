@@ -1,0 +1,5 @@
+{
+  "id": "task-014",
+  "prompt": "Create report.py with a function report() that returns exactly `status: ok`. Also create README.md whose first line is `# Report`, and create status.txt containing exactly `ready`.",
+  "verification_command": "test \"$(python3 -c 'from report import report; print(report())')\" = 'status: ok' && grep -q '^# Report$' README.md && grep -qx ready status.txt"
+}

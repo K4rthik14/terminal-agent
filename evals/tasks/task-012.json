@@ -1,0 +1,5 @@
+{
+  "id": "task-012",
+  "prompt": "Create input.txt with the three lines apple, banana, and cherry. Create process.py that reads input.txt, sorts the lines alphabetically, and writes them to output.txt one per line.",
+  "verification_command": "python3 -c \"from pathlib import Path; import sys; sys.exit(Path('output.txt').read_text() != 'apple\\nbanana\\ncherry\\n')\""
+}

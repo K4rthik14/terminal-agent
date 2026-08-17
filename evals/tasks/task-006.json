@@ -1,0 +1,5 @@
+{
+  "id": "task-006",
+  "prompt": "Create calculator.py with a function square(n) that returns n multiplied by itself, and add test_calculator.py containing a pytest test that verifies square(4) equals 16",
+  "verification_command": "test -f test_calculator.py && grep -q 'square(4)' test_calculator.py && pytest -q test_calculator.py"
+}

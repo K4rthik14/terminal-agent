@@ -1,0 +1,5 @@
+{
+  "id": "task-004",
+  "prompt": "Create bug.py containing a function add(a, b) that currently has an obvious incorrect result, then fix the bug so running `python3 -c \"from bug import add; print(add(2, 3))\"` prints 5",
+  "verification_command": "test \"$(python3 -c 'from bug import add; print(add(2, 3))')\" = 5"
+}

@@ -1,0 +1,5 @@
+{
+  "id": "task-013",
+  "prompt": "Create debug.py with a function total(values) that currently fails because of a clear runtime error. Debug and fix it so running `python3 -c \"from debug import total; print(total([1, 2, 3]))\"` prints 6.",
+  "verification_command": "test \"$(python3 -c 'from debug import total; print(total([1, 2, 3]))')\" = 6"
+}
