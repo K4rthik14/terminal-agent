@@ -28,6 +28,7 @@ from agent.agent import Agent
 from agent.context import AgentContext
 from cli.repl import Repl
 from cli.renderer import Renderer
+from verification.verifier import Verifier
 
 logger = get_logger(__name__)
 
@@ -52,7 +53,22 @@ def build_agent(settings: Settings, registry: ToolRegistry, renderer: Renderer |
         base_url=settings.base_url,
         max_tokens=settings.max_tokens,
     )
-    return Agent(llm=llm, registry=registry, settings=settings, renderer=renderer)
+    # Deterministic post-reply verification is opt-in: an empty command keeps
+    # the historical behavior (no Verifier constructed, no checks run).
+    verification_command = settings.verification_command.strip()
+    verifier = (
+        Verifier(timeout_seconds=settings.verification_timeout_seconds)
+        if verification_command
+        else None
+    )
+    return Agent(
+        llm=llm,
+        registry=registry,
+        settings=settings,
+        renderer=renderer,
+        verifier=verifier,
+        verification_command=verification_command,
+    )
 
 
 def resolve_settings(args: argparse.Namespace) -> Settings:

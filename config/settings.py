@@ -16,6 +16,8 @@ from config.defaults import (
     DEFAULT_PROVIDER,
     DEFAULT_LOG_LEVEL,
     DEFAULT_APPROVAL_MODE,
+    DEFAULT_VERIFICATION_COMMAND,
+    DEFAULT_VERIFICATION_TIMEOUT_SECONDS,
     MAX_ITERATIONS,
     MAX_WEB_CONTENT_LENGTH,
     MAX_CONTEXT_MESSAGES,
@@ -40,6 +42,8 @@ class Settings(BaseSettings):
     log_level: str = DEFAULT_LOG_LEVEL
     approval_mode: str = DEFAULT_APPROVAL_MODE   # "always" | "never" | "auto"
     plan_mode: bool = False
+    verification_command: str = DEFAULT_VERIFICATION_COMMAND   # empty = disabled
+    verification_timeout_seconds: int = DEFAULT_VERIFICATION_TIMEOUT_SECONDS
     firecrawl_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("AGENT_FIRECRAWL_API_KEY", "FIRECRAWL_API_KEY"),
