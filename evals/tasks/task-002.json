@@ -1,0 +1,5 @@
+{
+  "id": "task-002",
+  "prompt": "Create a directory named src and inside it a file README.md whose first line is: # my-project",
+  "verification_command": "test -f src/README.md && grep -qx '# my-project' src/README.md"
+}

@@ -1,0 +1,5 @@
+{
+  "id": "task-003",
+  "prompt": "Create a shell script named run.sh that prints exactly the single line: done",
+  "verification_command": "bash run.sh | grep -qx done"
+}

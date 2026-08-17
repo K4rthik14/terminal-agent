@@ -1,0 +1,5 @@
+{
+  "id": "task-001",
+  "prompt": "Create a file named hello.txt whose contents are exactly the single line: hello",
+  "verification_command": "grep -qx hello hello.txt"
+}
