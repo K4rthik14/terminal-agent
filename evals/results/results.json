@@ -3,83 +3,101 @@
     {
       "id": "task-001",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 32.413
     },
     {
       "id": "task-002",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 19.512
     },
     {
       "id": "task-003",
-      "passed": false,
-      "detail": "Command exited with code 1."
+      "passed": true,
+      "detail": "",
+      "duration_seconds": 170.836
     },
     {
       "id": "task-004",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 31.296
     },
     {
       "id": "task-005",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 12.894
     },
     {
       "id": "task-006",
       "passed": true,
-      "detail": ".                                                                        [100%]\n1 passed in 0.00s\n"
+      "detail": ".                                                                        [100%]\n1 passed in 0.00s\n",
+      "duration_seconds": 16.449
     },
     {
       "id": "task-007",
       "passed": true,
-      "detail": ".                                                                        [100%]\n1 passed in 0.00s\n"
+      "detail": ".                                                                        [100%]\n1 passed in 0.00s\n",
+      "duration_seconds": 19.451
     },
     {
       "id": "task-008",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 129.76
     },
     {
       "id": "task-009",
-      "passed": false,
-      "detail": "Command exited with code 1."
+      "passed": true,
+      "detail": "",
+      "duration_seconds": 45.171
     },
     {
       "id": "task-010",
-      "passed": false,
-      "detail": "Command exited with code 1."
+      "passed": true,
+      "detail": "",
+      "duration_seconds": 22.059
     },
     {
       "id": "task-011",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 20.438
     },
     {
       "id": "task-012",
-      "passed": true,
-      "detail": ""
+      "passed": false,
+      "detail": "Command exited with code 1.",
+      "duration_seconds": 3.174,
+      "failure_type": "verification_failed"
     },
     {
       "id": "task-013",
-      "passed": true,
-      "detail": ""
+      "passed": false,
+      "detail": "Command exited with code 1.",
+      "duration_seconds": 2.124,
+      "failure_type": "verification_failed"
     },
     {
       "id": "task-014",
       "passed": true,
-      "detail": ""
+      "detail": "",
+      "duration_seconds": 24.886
     },
     {
       "id": "task-015",
       "passed": false,
-      "detail": "Command exited with code 1."
+      "detail": "Command exited with code 1.",
+      "duration_seconds": 2.117,
+      "failure_type": "verification_failed"
     }
   ],
   "metrics": {
     "total_tasks": 15,
-    "passed_tasks": 11,
-    "failed_tasks": 4,
-    "success_rate": 0.7333333333333333
+    "passed_tasks": 12,
+    "failed_tasks": 3,
+    "success_rate": 0.8
   }
 }
