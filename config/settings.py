@@ -18,6 +18,7 @@ from config.defaults import (
     DEFAULT_APPROVAL_MODE,
     DEFAULT_VERIFICATION_COMMAND,
     DEFAULT_VERIFICATION_TIMEOUT_SECONDS,
+    DEFAULT_RLM_ENABLED,
     MAX_ITERATIONS,
     MAX_WEB_CONTENT_LENGTH,
     MAX_CONTEXT_MESSAGES,
@@ -49,3 +50,4 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AGENT_FIRECRAWL_API_KEY", "FIRECRAWL_API_KEY"),
         repr=False,
     )
+    rlm_enabled: bool = DEFAULT_RLM_ENABLED
