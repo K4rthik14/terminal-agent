@@ -8,19 +8,21 @@ Responsibilities:
 """
 
 import json
-from utils.types import ApprovalMode, ToolCall
-from utils.errors import LLMError
-from utils.logging import get_logger
-from llm.base import LLMClient
-from tools.registry import ToolRegistry
-from agent.context import AgentContext
+import time
+
 from agent.approver import Approver
+from agent.context import AgentContext
 from agent.executor import Executor
-from config.settings import Settings
 from cli.renderer import Renderer
+from config.settings import Settings
 from context.loop import LoopDetector
 from context.metrics import AgentRunMetrics
 from context.window import MessageWindow
+from llm.base import LLMClient
+from tools.registry import ToolRegistry
+from utils.errors import LLMError
+from utils.logging import get_logger
+from utils.types import ApprovalMode, ToolCall
 from verification.verifier import Verifier
 
 logger = get_logger(__name__)
@@ -64,8 +66,25 @@ class Agent:
         loop_detector = LoopDetector()
         metrics = AgentRunMetrics()
         self.last_run_metrics = metrics
+        started_at = time.monotonic()
         reply = ""
+
+        def budget_reason() -> str | None:
+            if (
+                getattr(self._settings, "max_execution_time_seconds", 0.0) > 0
+                and time.monotonic() - started_at
+                >= getattr(self._settings, "max_execution_time_seconds", 0.0)
+            ):
+                return "max_execution_time"
+            if metrics.tool_calls >= getattr(self._settings, "max_tool_calls", 2**31):
+                return "max_tool_calls"
+            return None
+
         for _ in range(self._settings.max_iterations):
+            reason = budget_reason()
+            if reason is not None:
+                metrics.mark_budget_exceeded(reason)
+                break
             self._renderer.thinking()
             # Accumulate streaming response
             reply = ""
@@ -101,6 +120,11 @@ class Agent:
 
             print()  # newline after streaming
 
+            reason = budget_reason()
+            if reason is not None:
+                metrics.mark_budget_exceeded(reason)
+                break
+
             if finish_reason == "tool_calls" and tool_calls:
                 # Add assistant message with tool calls to context
                 context.add_assistant_message(
@@ -116,6 +140,10 @@ class Agent:
                 )
                 # Execute all tool calls and append results
                 for tc in tool_calls:
+                    reason = budget_reason()
+                    if reason is not None:
+                        metrics.mark_budget_exceeded(reason)
+                        break
                     try:
                         args = json.loads(tc.arguments or "{}")
                     except json.JSONDecodeError:
@@ -160,6 +188,11 @@ class Agent:
                 metrics.finish(True)
                 return reply
 
+        if (
+            not metrics.budget_exceeded
+            and self._settings.max_iterations <= len(metrics.context_message_counts)
+        ):
+            metrics.mark_budget_exceeded("max_iterations")
         self._renderer.completed()
         metrics.finish(False)
         return reply

@@ -13,6 +13,9 @@ class AgentRunMetrics:
     success: bool = False
     execution_time: float = 0.0
     tool_usage: dict[str, int] = field(default_factory=dict)
+    tool_calls: int = 0
+    budget_exceeded: bool = False
+    budget_exceeded_reason: str | None = None
     loop_detection_events: int = 0
     context_message_counts: list[int] = field(default_factory=list)
     context_character_counts: list[int] = field(default_factory=list)
@@ -31,6 +34,12 @@ class AgentRunMetrics:
     def record_tool(self, name: str) -> None:
         """Record one attempted tool execution."""
         self.tool_usage[name] = self.tool_usage.get(name, 0) + 1
+        self.tool_calls += 1
+
+    def mark_budget_exceeded(self, reason: str) -> None:
+        """Record that an execution budget stopped the run."""
+        self.budget_exceeded = True
+        self.budget_exceeded_reason = reason
 
     def record_context(self, message_count: int, character_count: int, tool_count: int) -> None:
         """Record the size of one context sent to the model."""

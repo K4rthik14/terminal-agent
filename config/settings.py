@@ -10,18 +10,21 @@ Responsibilities:
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from config.defaults import (
-    DEFAULT_MODEL,
-    DEFAULT_BASE_URL,
-    DEFAULT_PROVIDER,
-    DEFAULT_LOG_LEVEL,
     DEFAULT_APPROVAL_MODE,
+    DEFAULT_BASE_URL,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+    DEFAULT_RLM_ENABLED,
     DEFAULT_VERIFICATION_COMMAND,
     DEFAULT_VERIFICATION_TIMEOUT_SECONDS,
-    DEFAULT_RLM_ENABLED,
-    MAX_ITERATIONS,
-    MAX_WEB_CONTENT_LENGTH,
     MAX_CONTEXT_MESSAGES,
+    MAX_EXECUTION_TIME_SECONDS,
+    MAX_ITERATIONS,
+    MAX_TOOL_CALLS,
+    MAX_WEB_CONTENT_LENGTH,
 )
 
 
@@ -38,6 +41,8 @@ class Settings(BaseSettings):
     )  # Never store or print API keys; supports both generic and OpenRouter names.
     max_tokens: int = 4096
     max_iterations: int = MAX_ITERATIONS
+    max_tool_calls: int = MAX_TOOL_CALLS
+    max_execution_time_seconds: float = MAX_EXECUTION_TIME_SECONDS
     max_context_messages: int = MAX_CONTEXT_MESSAGES
     max_web_content_length: int = MAX_WEB_CONTENT_LENGTH
     log_level: str = DEFAULT_LOG_LEVEL
