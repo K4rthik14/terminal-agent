@@ -1,5 +1,5 @@
 {
   "id": "task-003",
-  "prompt": "Create a directory named notes containing alpha.txt with the text ALPHA and beta.txt with the text BETA. Inspect the files and write answer.txt with exactly one line: alpha-before-beta",
-  "verification_command": "test -f answer.txt && grep -qx 'alpha-before-beta' answer.txt && test -f notes/alpha.txt && test -f notes/beta.txt"
+  "prompt": "Create alpha.txt containing exactly ALPHA and beta.txt containing exactly BETA. Inspect both files and write answer.txt with exactly one line: alpha-before-beta",
+  "verification_command": "test -f alpha.txt && test -f beta.txt && test -f answer.txt && grep -qx ALPHA alpha.txt && grep -qx BETA beta.txt && grep -qx 'alpha-before-beta' answer.txt"
 }

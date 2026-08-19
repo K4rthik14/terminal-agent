@@ -1,5 +1,5 @@
 {
   "id": "task-008",
-  "prompt": "Create package directory app with __init__.py and config.py. Define APP_NAME = 'terminal-agent' in config.py and re-export it from app/__init__.py.",
-  "verification_command": "test \"$(python3 -c 'from app import APP_NAME; print(APP_NAME)')\" = terminal-agent"
+  "prompt": "Create constants.py defining APP_NAME = 'terminal-agent' and create app_info.py that imports APP_NAME from constants.py and exposes a function get_app_name() returning it.",
+  "verification_command": "test \"$(python3 -c 'from app_info import get_app_name; print(get_app_name())')\" = terminal-agent && grep -q 'from constants import APP_NAME' app_info.py"
 }

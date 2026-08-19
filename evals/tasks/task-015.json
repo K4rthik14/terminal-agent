@@ -1,5 +1,5 @@
 {
   "id": "task-015",
-  "prompt": "Create recover.py with a function answer() and initially make a reasonable first attempt that returns the wrong value. Before finishing, recover from that mistake and correct answer() so it returns 42. The final implementation must be clean and importable.",
+  "prompt": "Create recover.py with an answer() function that returns 42. Before finishing, execute a direct check of answer(), notice and correct any incorrect result, and leave the final implementation clean and importable.",
   "verification_command": "test \"$(python3 -c 'from recover import answer; print(answer())')\" = 42"
 }

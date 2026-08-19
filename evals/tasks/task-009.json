@@ -1,5 +1,5 @@
 {
   "id": "task-009",
-  "prompt": "Create a directory named archive and a file named archive/source.txt containing the single line ready. This is a filesystem setup task; leave the final file in that exact location.",
-  "verification_command": "test -d archive && test -f archive/source.txt && grep -qx ready archive/source.txt"
+  "prompt": "Create a shell script named run.sh that prints exactly ready, make it executable, and leave it in the workspace.",
+  "verification_command": "test -x run.sh && test \"$(./run.sh)\" = ready"
 }

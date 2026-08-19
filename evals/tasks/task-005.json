@@ -1,5 +1,5 @@
 {
   "id": "task-005",
-  "prompt": "Create numbers.py and add a function multiply(a, b) that returns the product of its two arguments. Do not print anything when the module is imported.",
-  "verification_command": "test \"$(python3 -c 'from numbers import multiply; print(multiply(6, 7))')\" = 42"
+  "prompt": "Create arithmetic.py with a function multiply(a, b) that returns the product of its two arguments. Do not print anything when the module is imported.",
+  "verification_command": "test \"$(python3 -c 'from arithmetic import multiply; print(multiply(6, 7))')\" = 42"
 }
