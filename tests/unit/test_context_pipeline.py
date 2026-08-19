@@ -1,9 +1,9 @@
 """Unit tests for state-driven context selection."""
 
 from context.conversation import ConversationSelector
+from context.evaluator import ContextEvaluator
 from context.files import RelevantFileSelector
 from context.goal import GoalExtractor
-from context.evaluator import ContextEvaluator
 from context.manager import ContextManager
 from context.models import ContextSelection, ContextState
 from context.orchestrator import PromptOrchestrator
@@ -78,6 +78,19 @@ def test_conversation_selector_excludes_stale_system_messages() -> None:
     )
 
     assert selected == [{"role": "user", "content": "current task"}]
+
+
+def test_prompt_lists_selected_tool_capabilities_and_limitations() -> None:
+    state = ContextState(goal="Create a directory, write a file, and run a shell command")
+
+    selection = ContextManager().build(state, [ReadFileTool(), WriteFileTool(), BashTool()])
+    system_prompt = selection.messages[0]["content"]
+
+    assert "Available tools:" in system_prompt
+    assert "read_file — Read a file from disk" in system_prompt
+    assert "write_file — Write content to a file" in system_prompt
+    assert "does not create missing parent directories" in system_prompt
+    assert "bash — Run a shell command" in system_prompt
 
 
 def test_context_manager_builds_fresh_system_context() -> None:

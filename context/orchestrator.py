@@ -40,7 +40,12 @@ class PromptOrchestrator:
         relevant_files = self._files.select(state)
         selected_tools = self._scheduler.schedule(state, tools)
         conversation = self._conversation.select(state)
-        system_message = self._prompts.build_system_message(goal, relevant_files, state)
+        system_message = self._prompts.build_system_message(
+            goal,
+            relevant_files,
+            state,
+            available_tools=selected_tools,
+        )
         messages = self._prompts.assemble(system_message, conversation)
         return ContextSelection(
             messages=messages,
