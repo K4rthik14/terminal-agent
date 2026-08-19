@@ -1,5 +1,5 @@
 {
   "id": "task-015",
-  "prompt": "Create recover.py with an answer() function that returns 42. Before finishing, execute a direct check of answer(), notice and correct any incorrect result, and leave the final implementation clean and importable.",
+  "prompt": "Create recover.py containing a function named answer() that should return 42. First implement your solution, then run a direct check of answer(). If the check does not produce 42, inspect the implementation, identify the problem, and correct it. Leave recover.py with a clean, importable implementation that makes answer() return 42.",
   "verification_command": "test \"$(python3 -c 'from recover import answer; print(answer())')\" = 42"
 }
