@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 
+from agent.approver import Approver
 from evals import judge, metrics, runner
+from utils.types import ApprovalMode
 
 EVALS_TASKS_DIR = Path(__file__).parents[2] / "evals" / "tasks"
 
@@ -54,6 +56,32 @@ def solving_agent_factory():
 
 
 # --- judge ---
+
+
+def test_runner_accepts_no_approval_flag(monkeypatch) -> None:
+    class SettingsStub:
+        api_key = ""
+        approval_mode = "auto"
+
+    monkeypatch.setattr(runner, "Settings", SettingsStub)
+
+    assert runner.main(["--no-approval"]) == 1
+
+
+def test_no_approval_sets_existing_approver_mode() -> None:
+    settings = runner.resolve_settings(no_approval=True)
+
+    assert settings.approval_mode == "never"
+    assert Approver(ApprovalMode(settings.approval_mode)).requires_approval(False) is False
+
+
+def test_missing_no_approval_preserves_normal_approval_mode(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_APPROVAL_MODE", "always")
+
+    settings = runner.resolve_settings()
+
+    assert settings.approval_mode == "always"
+    assert Approver(ApprovalMode(settings.approval_mode)).requires_approval(True) is True
 
 
 def test_judge_passes_when_command_succeeds(tmp_path, monkeypatch) -> None:

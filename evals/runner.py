@@ -93,6 +93,14 @@ def default_agent_factory(settings: Settings) -> AgentFactory:
     return factory
 
 
+def resolve_settings(no_approval: bool = False) -> Settings:
+    """Load evaluation settings and apply runner-only approval overrides."""
+    settings = Settings()
+    if no_approval:
+        settings.approval_mode = "never"
+    return settings
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point: python -m evals.runner"""
     parser = argparse.ArgumentParser(
@@ -101,9 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--tasks-dir", default=str(Path(__file__).parent / "tasks"))
     parser.add_argument("--results-dir", default=str(Path(__file__).parent / "results"))
+    parser.add_argument(
+        "--no-approval",
+        action="store_true",
+        help="Skip human approval for all evaluation tool calls",
+    )
     args = parser.parse_args(argv)
 
-    settings = Settings()
+    settings = resolve_settings(args.no_approval)
     if not settings.api_key:
         print("No API key found. Set AGENT_API_KEY or OPENROUTER_API_KEY.")
         return 1
