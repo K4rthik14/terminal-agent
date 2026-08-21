@@ -32,6 +32,9 @@ from config.defaults import (
 # configuration guidance in the CLI.
 API_KEY_ENV_VARS: tuple[str, str] = ("AGENT_API_KEY", "OPENROUTER_API_KEY")
 
+# Environment variable that selects the active LLM model.
+MODEL_ENV_VAR: str = "AGENT_MODEL"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_file=".env", extra="ignore")

@@ -16,7 +16,7 @@ from agent.agent import Agent
 from agent.context import AgentContext
 from cli.renderer import Renderer
 from cli.repl import Repl
-from config.settings import API_KEY_ENV_VARS, Settings
+from config.settings import API_KEY_ENV_VARS, MODEL_ENV_VAR, Settings
 from llm.base import LLMClient
 from llm.openai_client import OpenAIClient
 from rlm.controller import RLMController
@@ -123,8 +123,8 @@ def resolve_settings(args: argparse.Namespace) -> Settings:
         settings.firecrawl_api_key = os.environ.get("FIRECRAWL_API_KEY", "")
 
     # CLI overrides
-    if args.model:
-        settings.model = args.model
+    if args.model and args.model.strip():
+        settings.model = args.model.strip()
     if args.plan:
         settings.plan_mode = True
     if args.no_approval:
@@ -148,6 +148,22 @@ def missing_api_key_message() -> str:
         "\n"
         "Option 2 — .env file in your project root (see .env.example):\n"
         f"  {primary}=<your-api-key>\n"
+    )
+
+
+def missing_model_message() -> str:
+    """Explain how to select a model when none is configured."""
+    return (
+        "No model configured. Trace Code needs an LLM model name.\n"
+        "\n"
+        "Option 1 — command line:\n"
+        "  trace --model <model-name>\n"
+        "\n"
+        "Option 2 — environment variable:\n"
+        f"  export {MODEL_ENV_VAR}=<model-name>\n"
+        "\n"
+        "Option 3 — .env file in your project root (see .env.example):\n"
+        f"  {MODEL_ENV_VAR}=<model-name>\n"
     )
 
 
@@ -184,6 +200,12 @@ def main() -> None:
 
     if not settings.api_key:
         renderer.error(missing_api_key_message())
+        sys.exit(1)
+
+    if not settings.model.strip():
+        # Fail fast on an explicitly empty model rather than sending an invalid
+        # request to the provider. Unset models keep the built-in default.
+        renderer.error(missing_model_message())
         sys.exit(1)
 
     def agent_factory() -> Agent:
