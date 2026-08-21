@@ -10,10 +10,22 @@ from __future__ import annotations
 
 import os
 import time
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _package_version
 from typing import Any
 
 from rich.console import Console
 console = Console()
+
+_FALLBACK_VERSION = "0.1.0"
+
+
+def _resolve_version() -> str:
+    """Return the installed package version, falling back to a known default."""
+    try:
+        return _package_version("terminal-agent")
+    except PackageNotFoundError:
+        return _FALLBACK_VERSION
 
 
 class Renderer:
@@ -25,21 +37,19 @@ class Renderer:
         self._approval_mode = approval_mode
 
     def banner(self, model: str | None = None) -> None:
-        """Render a minimal startup banner."""
-
+        """Render a concise startup identity line."""
         model_label = model or self._model
         cwd = os.path.basename(os.getcwd()) or os.getcwd()
 
         console.print(
-            f"[bold cyan]nanocode[/] "
-            f"[dim]• {model_label} • {cwd}[/]"
+            f"[bold cyan]Trace Code[/] [dim]v{_resolve_version()} · {model_label} · {cwd}[/]"
         )
-
         console.print(
             f"[green]✓ Ready[/]  "
             f"[dim]Plan: {'ON' if self._plan_mode else 'OFF'}  "
-            f"Approval: {self._approval_mode.upper()}[/]\n"
+            f"Approval: {self._approval_mode.upper()}[/]"
         )
+        console.print("[dim]/plan toggle planning · Ctrl+C interrupt · Ctrl+D exit[/]\n")
 
     def thinking(self) -> None:
         console.print("[cyan]⠋ Thinking...[/]")

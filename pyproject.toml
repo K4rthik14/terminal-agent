@@ -12,6 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
+trace = "cli.main:main"
 nanocode = "cli.main:main"
 agent = "cli.main:main"
 

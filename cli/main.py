@@ -118,8 +118,8 @@ def resolve_settings(args: argparse.Namespace) -> Settings:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="nanocode",
-        description="nanocode — a terminal coding agent",
+        prog="trace",
+        description="Trace Code — a terminal coding agent",
     )
     parser.add_argument("--model", default="", help="Override LLM model name")
     parser.add_argument("--plan", action="store_true", help="Start in plan mode")
