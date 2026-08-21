@@ -27,6 +27,11 @@ from config.defaults import (
     MAX_WEB_CONTENT_LENGTH,
 )
 
+# Accepted environment variables for the LLM provider API key, in priority order.
+# Single source of truth: used by the Settings field alias and by user-facing
+# configuration guidance in the CLI.
+API_KEY_ENV_VARS: tuple[str, str] = ("AGENT_API_KEY", "OPENROUTER_API_KEY")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_file=".env", extra="ignore")
@@ -36,7 +41,7 @@ class Settings(BaseSettings):
     model: str = DEFAULT_MODEL
     api_key: str = Field(
         default="",
-        validation_alias=AliasChoices("AGENT_API_KEY", "OPENROUTER_API_KEY"),
+        validation_alias=AliasChoices(*API_KEY_ENV_VARS),
         repr=False,
     )  # Never store or print API keys; supports both generic and OpenRouter names.
     max_tokens: int = 4096

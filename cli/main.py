@@ -16,7 +16,7 @@ from agent.agent import Agent
 from agent.context import AgentContext
 from cli.renderer import Renderer
 from cli.repl import Repl
-from config.settings import Settings
+from config.settings import API_KEY_ENV_VARS, Settings
 from llm.base import LLMClient
 from llm.openai_client import OpenAIClient
 from rlm.controller import RLMController
@@ -133,6 +133,24 @@ def resolve_settings(args: argparse.Namespace) -> Settings:
     return settings
 
 
+def missing_api_key_message() -> str:
+    """Explain which configuration is missing and how to set it.
+
+    Never includes or echoes any secret value — only variable names.
+    """
+    primary, fallback = API_KEY_ENV_VARS
+    return (
+        "No API key configured. Trace Code needs an LLM provider API key.\n"
+        "\n"
+        "Option 1 — environment variable:\n"
+        f"  export {primary}=<your-api-key>\n"
+        f"  ({fallback} is also accepted)\n"
+        "\n"
+        "Option 2 — .env file in your project root (see .env.example):\n"
+        f"  {primary}=<your-api-key>\n"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="trace",
@@ -165,7 +183,7 @@ def main() -> None:
     )
 
     if not settings.api_key:
-        renderer.error("No API key found. Set AGENT_API_KEY or OPENROUTER_API_KEY.")
+        renderer.error(missing_api_key_message())
         sys.exit(1)
 
     def agent_factory() -> Agent:
