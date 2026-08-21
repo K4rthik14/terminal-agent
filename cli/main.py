@@ -10,7 +10,10 @@ Responsibilities:
 import argparse
 import os
 import sys
+import traceback
 from argparse import RawDescriptionHelpFormatter
+
+from pydantic import ValidationError
 
 from agent.agent import Agent
 from agent.context import AgentContext
@@ -29,6 +32,7 @@ from tools.sub_agent import SubAgentTool
 from tools.todo import TodoWriteTool
 from tools.web_fetch import WebFetchTool
 from tools.web_search import WebSearchTool
+from utils.errors import AgentError, ConfigError
 from utils.logging import configure_logging, get_logger
 from verification.verifier import Verifier
 
@@ -110,9 +114,41 @@ def build_effective_prompt(prompt: str, rlm_controller: RLMController | None = N
     return f"Execution brief:\n{rlm_result.brief}\n\nNow execute the task: {prompt}"
 
 
+def invalid_config_message(exc: ValidationError) -> str:
+    """Describe which configuration variables are invalid and how to fix them.
+
+    Names only variable names and expected types — never echoes values,
+    since environment values may contain secrets.
+    """
+    lines = []
+    for error in exc.errors()[:5]:
+        field = ".".join(str(part) for part in error.get("loc", ()))
+        env_name = f"AGENT_{field.upper()}" if field else "environment"
+        lines.append(f"  {env_name}: {error.get('msg', 'invalid value')}")
+    details = "\n".join(lines) if lines else "  (unknown configuration error)"
+    return (
+        "Invalid configuration:\n"
+        f"{details}\n"
+        "\n"
+        "Fix the value in your environment or .env file, then try again."
+    )
+
+
+def unexpected_error_message(exc: Exception) -> str:
+    """Concise report for unexpected internal errors, with a debug escape hatch."""
+    return (
+        f"Unexpected error: {type(exc).__name__}: {exc}\n"
+        "This looks like a bug in Trace Code. "
+        "Re-run with AGENT_LOG_LEVEL=debug for a full traceback."
+    )
+
+
 def resolve_settings(args: argparse.Namespace) -> Settings:
     """Load settings and apply CLI overrides + env var fallbacks."""
-    settings = Settings()
+    try:
+        settings = Settings()
+    except ValidationError as exc:
+        raise ConfigError(invalid_config_message(exc)) from exc
 
     # Fallback: OPENROUTER_API_KEY -> AGENT_API_KEY
     if not settings.api_key:
@@ -189,7 +225,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    settings = resolve_settings(args)
+    try:
+        settings = resolve_settings(args)
+    except ConfigError as exc:
+        # Invalid configuration values (wrong types, etc.) — no traceback needed.
+        Renderer().error(str(exc))
+        sys.exit(1)
+
     configure_logging(settings.log_level)
 
     renderer = Renderer(
@@ -212,28 +254,44 @@ def main() -> None:
         sub_registry = build_registry(settings, agent_factory)
         return build_agent(settings, sub_registry)
 
-    registry = build_registry(settings, agent_factory)
-    llm = build_llm(settings)
-    agent = build_agent(settings, registry, renderer=renderer, llm=llm)
+    try:
+        registry = build_registry(settings, agent_factory)
+        llm = build_llm(settings)
+        agent = build_agent(settings, registry, renderer=renderer, llm=llm)
 
-    if args.prompt:
-        # Single-shot mode
-        context = AgentContext(
-            plan_mode=settings.plan_mode,
-            max_context_messages=settings.max_context_messages,
-        )
-        context.init_system_message()
-        rlm_controller = RLMController(llm=llm, registry=registry) if settings.rlm_enabled else None
-        agent.run(build_effective_prompt(args.prompt, rlm_controller), context=context)
-    else:
-        # Interactive REPL
-        context = AgentContext(
-            plan_mode=settings.plan_mode,
-            max_context_messages=settings.max_context_messages,
-        )
-        context.init_system_message()
-        repl = Repl(agent=agent, context=context, renderer=renderer)
-        repl.run()
+        if args.prompt:
+            # Single-shot mode
+            context = AgentContext(
+                plan_mode=settings.plan_mode,
+                max_context_messages=settings.max_context_messages,
+            )
+            context.init_system_message()
+            rlm_controller = (
+                RLMController(llm=llm, registry=registry) if settings.rlm_enabled else None
+            )
+            agent.run(build_effective_prompt(args.prompt, rlm_controller), context=context)
+        else:
+            # Interactive REPL
+            context = AgentContext(
+                plan_mode=settings.plan_mode,
+                max_context_messages=settings.max_context_messages,
+            )
+            context.init_system_message()
+            repl = Repl(agent=agent, context=context, renderer=renderer)
+            repl.run()
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        sys.exit(130)
+    except AgentError as exc:
+        # Runtime failures (provider, RLM, etc.) already carry actionable
+        # messages; render them concisely instead of a raw traceback.
+        renderer.error(str(exc))
+        sys.exit(1)
+    except Exception as exc:
+        renderer.error(unexpected_error_message(exc))
+        if settings.log_level.lower() == "debug":
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
