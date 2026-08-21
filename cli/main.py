@@ -10,6 +10,7 @@ Responsibilities:
 import argparse
 import os
 import sys
+from argparse import RawDescriptionHelpFormatter
 
 from agent.agent import Agent
 from agent.context import AgentContext
@@ -32,6 +33,22 @@ from utils.logging import configure_logging, get_logger
 from verification.verifier import Verifier
 
 logger = get_logger(__name__)
+
+HELP_EPILOG = """\
+examples:
+  trace                                    start an interactive session
+  trace --plan                             plan without applying changes
+  trace --no-approval --prompt "fix the failing tests"
+                                           run one task end-to-end, no prompts
+
+environment:
+  AGENT_API_KEY                            LLM provider API key (required);
+                                           OPENROUTER_API_KEY also accepted
+  AGENT_FIRECRAWL_API_KEY                  optional; enables web search/fetch
+  AGENT_MODEL                              default model (--model overrides it)
+
+Settings load from the environment and a local .env file.
+"""
 
 
 def build_registry(settings: Settings, agent_factory) -> ToolRegistry:
@@ -119,14 +136,23 @@ def resolve_settings(args: argparse.Namespace) -> Settings:
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="trace",
-        description="Trace Code — a terminal coding agent",
+        description=(
+            "Trace Code — an AI coding agent for your terminal.\n"
+            "Starts an interactive session by default; use --prompt for one-shot tasks."
+        ),
+        epilog=HELP_EPILOG,
+        formatter_class=RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--model", default="", help="Override LLM model name")
-    parser.add_argument("--plan", action="store_true", help="Start in plan mode")
+    parser.add_argument("--model", default="", help="LLM model to use (overrides AGENT_MODEL)")
     parser.add_argument(
-        "--no-approval", action="store_true", help="Skip human approval for all tools"
+        "--plan", action="store_true", help="plan only: write tools are disabled"
     )
-    parser.add_argument("--prompt", default="", help="Run a single prompt and exit")
+    parser.add_argument(
+        "--no-approval", action="store_true", help="run all tool calls without approval prompts"
+    )
+    parser.add_argument(
+        "--prompt", default="", metavar="TEXT", help="run a single prompt, then exit"
+    )
     args = parser.parse_args()
 
     settings = resolve_settings(args)
