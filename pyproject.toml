@@ -1,7 +1,7 @@
 [project]
-name = "terminal-agent"
+name = "reflex-code"
 version = "0.1.0"
-description = "A production-quality modular terminal coding agent."
+description = "Reflex Code — an autonomous coding agent for your terminal."
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.0.0",
@@ -12,6 +12,8 @@ dependencies = [
 ]
 
 [project.scripts]
+reflex = "cli.main:main"
+# Legacy command aliases, kept for backward compatibility.
 trace = "cli.main:main"
 nanocode = "cli.main:main"
 agent = "cli.main:main"

@@ -20,26 +20,30 @@ from rich.console import Console
 console = Console(highlight=False)
 
 _FALLBACK_VERSION = "0.1.0"
+# Distribution names that may carry the version metadata, newest first.
+_DISTRIBUTION_NAMES = ("reflex-code", "terminal-agent")
 _SUMMARY_LIMIT = 100
 
 _TOOL_LABELS = {
-    "read_file": "Reading",
-    "write_file": "Writing",
-    "edit_file": "Editing",
-    "bash": "Running",
-    "todo_write": "Updating todos",
-    "web_search": "Searching",
-    "web_fetch": "Fetching",
-    "task": "Delegating",
+    "read_file": "Read file",
+    "write_file": "Write file",
+    "edit_file": "Edit file",
+    "bash": "Run command",
+    "todo_write": "Update todos",
+    "web_search": "Web search",
+    "web_fetch": "Web fetch",
+    "task": "Sub-agent",
 }
 
 
 def _resolve_version() -> str:
     """Return the installed package version, falling back to a known default."""
-    try:
-        return _package_version("terminal-agent")
-    except PackageNotFoundError:
-        return _FALLBACK_VERSION
+    for distribution in _DISTRIBUTION_NAMES:
+        try:
+            return _package_version(distribution)
+        except PackageNotFoundError:
+            continue
+    return _FALLBACK_VERSION
 
 
 def _ellipsize(text: str, limit: int = _SUMMARY_LIMIT) -> str:
@@ -64,6 +68,16 @@ def _shorten_path(path: str, limit: int = _SUMMARY_LIMIT) -> str:
     return candidate
 
 
+def _display_cwd(limit: int = 48) -> str:
+    """~-abbreviated current working directory, tail-kept when long."""
+    cwd = os.getcwd()
+    home = os.path.expanduser("~")
+    candidate = f"~{cwd[len(home):]}" if cwd.startswith(home) else cwd
+    if len(candidate) > limit:
+        candidate = f"…{candidate[-(limit - 1):]}"
+    return candidate
+
+
 class Renderer:
     """Compact terminal renderer for interactive and single-shot sessions."""
 
@@ -73,17 +87,17 @@ class Renderer:
         self._model = model or "AI coding agent"
         self._plan_mode = plan_mode
         self._approval_mode = approval_mode
+        self._active_activity: tuple[str, str] | None = None
 
     def banner(self, model: str | None = None) -> None:
-        """Render a concise startup identity line."""
+        """Render a compact startup header: identity, tagline, session status."""
         model_label = model or self._model
-        cwd = os.path.basename(os.getcwd()) or os.getcwd()
 
+        console.print("[bold cyan]REFLEX CODE[/]")
+        console.print(f"[dim]An autonomous coding agent. v{_resolve_version()}[/]\n")
         console.print(
-            f"[bold cyan]Trace Code[/] [dim]v{_resolve_version()} · {model_label} · {cwd}[/]"
-        )
-        console.print(
-            f"[green]✓ Ready[/] [dim]· plan {'on' if self._plan_mode else 'off'}"
+            f"{model_label} [dim]· {_display_cwd()}"
+            f" · plan {'on' if self._plan_mode else 'off'}"
             f" · approval {self._approval_mode}[/]"
         )
         console.print("[dim]/plan toggle planning · Ctrl+C interrupt · Ctrl+D exit[/]\n")
@@ -94,17 +108,24 @@ class Renderer:
     def executing(self, tool_name: str, args: dict[str, Any]) -> float:
         """Render one compact activity line and return its start time."""
         summary = self._tool_summary(tool_name, args)
-        label = _TOOL_LABELS.get(tool_name, "Running")
+        label = _TOOL_LABELS.get(tool_name, "Working")
         line = f"[cyan]⠋ {label}[/]"
         if summary:
             line += f" [dim]· {summary}[/]"
         console.print(line)
+        self._active_activity = (label, summary)
         return time.monotonic()
 
     def completed_tool(self, tool_name: str, success: bool, started_at: float) -> None:
         duration = time.monotonic() - started_at
-        mark, label, color = ("✓", "Done", "green") if success else ("✗", "Failed", "red")
-        console.print(f"[{color}]{mark} {label}[/] [dim]({duration:.1f}s)[/]\n")
+        label, summary = self._active_activity or (_TOOL_LABELS.get(tool_name, "Done"), "")
+        self._active_activity = None
+        mark, color = ("✓", "green") if success else ("✗", "red")
+        line = f"[{color}]{mark} {label}[/]" if success else f"[{color}]✗ {label} failed[/]"
+        if summary:
+            line += f" [dim]· {summary}[/]"
+        line += f" [dim]({duration:.1f}s)[/]"
+        console.print(line + "\n")
 
     def completed(self) -> None:
         console.print("[green]✓ Completed[/]\n")

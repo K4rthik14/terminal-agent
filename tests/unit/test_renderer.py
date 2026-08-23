@@ -13,7 +13,7 @@ def test_executing_renders_single_compact_line(capsys) -> None:
     out = capsys.readouterr().out
     assert isinstance(started, float)
     assert out.count("\n") == 1  # exactly one line, no multi-line cards
-    assert "Running" in out
+    assert "Run command" in out
     assert "rm -rf build/" in out
 
 
@@ -22,12 +22,12 @@ def test_completed_tool_success_and_failure_markers(capsys) -> None:
     renderer.completed_tool("bash", True, 0.0)
     success_out = capsys.readouterr().out
     assert "✓" in success_out
-    assert "Failed" not in success_out
+    assert "failed" not in success_out
 
     renderer.completed_tool("bash", False, 0.0)
     failure_out = capsys.readouterr().out
     assert "✗" in failure_out
-    assert "Failed" in failure_out
+    assert "failed" in failure_out
 
 
 def test_error_prefix_rendered(capsys) -> None:
@@ -82,5 +82,6 @@ def test_shorten_path_keeps_tail_when_truncating() -> None:
 def test_banner_mentions_identity(capsys) -> None:
     Renderer(model="test-model").banner()
     out = capsys.readouterr().out
-    assert "Trace Code" in out
+    assert "REFLEX CODE" in out
+    assert "An autonomous coding agent." in out
     assert "test-model" in out

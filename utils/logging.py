@@ -22,5 +22,6 @@ def configure_logging(level: str) -> None:
     numeric_level = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(format=_DEFAULT_FORMAT, level=numeric_level)
     # Silence noisy third-party loggers that would clutter agent output.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # "httpx2"/"httpcore2" are alias-installed copies used by some SDK builds.
+    for name in ("httpx", "httpcore", "httpx2", "httpcore2"):
+        logging.getLogger(name).setLevel(logging.WARNING)

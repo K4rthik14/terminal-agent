@@ -40,10 +40,10 @@ logger = get_logger(__name__)
 
 HELP_EPILOG = """\
 examples:
-  trace                                    start an interactive session
-  trace --plan                             plan without applying changes
-  trace --no-approval --prompt "fix the failing tests"
-                                           run one task end-to-end, no prompts
+  reflex                                    start an interactive session
+  reflex --plan                             plan without applying changes
+  reflex --no-approval --prompt "fix the failing tests"
+                                            run one task end-to-end, no prompts
 
 environment:
   AGENT_API_KEY                            LLM provider API key (required);
@@ -138,7 +138,7 @@ def unexpected_error_message(exc: Exception) -> str:
     """Concise report for unexpected internal errors, with a debug escape hatch."""
     return (
         f"Unexpected error: {type(exc).__name__}: {exc}\n"
-        "This looks like a bug in Trace Code. "
+        "This looks like a bug in Reflex Code. "
         "Re-run with AGENT_LOG_LEVEL=debug for a full traceback."
     )
 
@@ -176,7 +176,7 @@ def missing_api_key_message() -> str:
     """
     primary, fallback = API_KEY_ENV_VARS
     return (
-        "No API key configured. Trace Code needs an LLM provider API key.\n"
+        "No API key configured. Reflex Code needs an LLM provider API key.\n"
         "\n"
         "Option 1 — environment variable:\n"
         f"  export {primary}=<your-api-key>\n"
@@ -190,10 +190,10 @@ def missing_api_key_message() -> str:
 def missing_model_message() -> str:
     """Explain how to select a model when none is configured."""
     return (
-        "No model configured. Trace Code needs an LLM model name.\n"
+        "No model configured. Reflex Code needs an LLM model name.\n"
         "\n"
         "Option 1 — command line:\n"
-        "  trace --model <model-name>\n"
+        "  reflex --model <model-name>\n"
         "\n"
         "Option 2 — environment variable:\n"
         f"  export {MODEL_ENV_VAR}=<model-name>\n"
@@ -205,9 +205,9 @@ def missing_model_message() -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="trace",
+        prog="reflex",
         description=(
-            "Trace Code — an AI coding agent for your terminal.\n"
+            "Reflex Code — an autonomous coding agent for your terminal.\n"
             "Starts an interactive session by default; use --prompt for one-shot tasks."
         ),
         epilog=HELP_EPILOG,

@@ -1,16 +1,16 @@
-# Trace Code
+# Reflex Code
 
 > An autonomous coding agent.
 
-Trace Code is an AI coding agent that lives in your terminal. Give it a task in natural language and it reads your code, edits files, runs commands, and verifies results — asking for your approval before consequential actions.
+Reflex Code is an AI coding agent that lives in your terminal. Give it a task in natural language and it reads your code, edits files, runs commands, and verifies results — asking for your approval before consequential actions.
 
-Unlike traditional chat-based agents that continuously append conversation history, Trace Code rebuilds its prompt every iteration using a state-driven context pipeline, keeping context compact and interactions predictable.
+Unlike traditional chat-based agents that continuously append conversation history, Reflex Code rebuilds its prompt every iteration using a state-driven context pipeline, keeping context compact and interactions predictable.
 
 ---
 
 # Quickstart
 
-Install → Configure → Run → Give Trace Code a task.
+Install → Configure → Run → Give Reflex Code a task.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ cd terminal-agent
 uv sync
 ```
 
-This creates a virtual environment and installs the `trace` command inside it.
+This creates a virtual environment and installs the `reflex` command inside it.
 
 Prefer plain pip?
 
@@ -39,14 +39,14 @@ pip install -e .
 Verify the installation:
 
 ```bash
-trace --help
+reflex --help
 ```
 
-(With uv you can also run it without activating: `uv run trace --help`.)
+(With uv you can also run it without activating: `uv run reflex --help`.)
 
 ## 2. Configure
 
-Trace Code needs one API key. Export it as an environment variable:
+Reflex Code needs one API key. Export it as an environment variable:
 
 ```bash
 export AGENT_API_KEY="<your-api-key>"
@@ -69,7 +69,7 @@ Optional: set `AGENT_FIRECRAWL_API_KEY` to enable the web search/fetch tools.
 ## 3. Run
 
 ```bash
-trace
+reflex
 ```
 
 This starts an interactive session:
@@ -77,9 +77,9 @@ This starts an interactive session:
 - Type tasks at the `>` prompt.
 - `/plan` toggles plan mode (read-only planning; write tools disabled).
 - `Ctrl+C` interrupts, `Ctrl+D` exits.
-- In the default approval mode, Trace Code asks before running commands or modifying files.
+- In the default approval mode, Reflex Code asks before running commands or modifying files.
 
-## 4. Give Trace Code a task
+## 4. Give Reflex Code a task
 
 In an interactive session:
 
@@ -90,7 +90,7 @@ In an interactive session:
 Or run a single task non-interactively:
 
 ```bash
-trace --prompt "explain what src/parser.py does in three sentences"
+reflex --prompt "explain what src/parser.py does in three sentences"
 ```
 
 Useful flags:
@@ -123,22 +123,22 @@ See `.env.example` for the annotated list.
 # Troubleshooting
 
 **`No API key configured`**
-Set `AGENT_API_KEY` in your environment or in a `.env` file in the directory where you run `trace`. See step 2 above.
+Set `AGENT_API_KEY` in your environment or in a `.env` file in the directory where you run `reflex`. See step 2 above.
 
-**`trace: command not found`**
-Your virtual environment is not active. Either activate it (`source .venv/bin/activate`) or run through uv (`uv run trace ...`).
+**`reflex: command not found`**
+Your virtual environment is not active. Either activate it (`source .venv/bin/activate`) or run through uv (`uv run reflex ...`).
 
 **Provider error: `<model>` is not a valid model ID**
 The configured model name was rejected by the provider. Check the exact model identifier and set it via `--model` or `AGENT_MODEL`.
 
 **Python version error during installation**
-Trace Code requires Python 3.11+. Check with `python3 --version`.
+Reflex Code requires Python 3.11+. Check with `python3 --version`.
 
 ---
 
 # Development
 
-Work on Trace Code itself:
+Work on Reflex Code itself:
 
 ```bash
 uv sync          # create/update the environment
