@@ -41,6 +41,7 @@ logger = get_logger(__name__)
 HELP_EPILOG = """\
 examples:
   reflex                                    start an interactive session
+  reflex --model <model>                    choose the model for this session
   reflex --plan                             plan without applying changes
   reflex --no-approval --prompt "fix the failing tests"
                                             run one task end-to-end, no prompts
@@ -213,7 +214,12 @@ def main() -> None:
         epilog=HELP_EPILOG,
         formatter_class=RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--model", default="", help="LLM model to use (overrides AGENT_MODEL)")
+    parser.add_argument(
+        "--model",
+        default="",
+        metavar="MODEL",
+        help="model to use for this session, e.g. provider/model-id (overrides AGENT_MODEL)",
+    )
     parser.add_argument(
         "--plan", action="store_true", help="plan only: write tools are disabled"
     )

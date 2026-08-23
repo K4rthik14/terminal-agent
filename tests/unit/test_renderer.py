@@ -79,6 +79,14 @@ def test_shorten_path_keeps_tail_when_truncating() -> None:
     assert result.endswith("target-file.txt")
 
 
+def _force_tty(monkeypatch, width: int) -> None:
+    """Make the shared renderer console behave like a wide terminal."""
+    import cli.renderer as renderer_module
+
+    monkeypatch.setattr(renderer_module.console, "_width", width)
+    monkeypatch.setattr(renderer_module.console, "_force_terminal", True)
+
+
 def test_banner_mentions_identity(capsys) -> None:
     Renderer(model="test-model").banner()
     out = capsys.readouterr().out
@@ -87,36 +95,49 @@ def test_banner_mentions_identity(capsys) -> None:
     assert "test-model" in out
 
 
-def test_banner_renders_gradient_wordmark_when_wide(capsys, monkeypatch) -> None:
-    import cli.renderer as renderer_module
-
-    monkeypatch.setattr(renderer_module.console, "_width", 120)
-    monkeypatch.setattr(renderer_module.console, "_force_terminal", True)
+def test_banner_renders_metadata_panel_when_wide(capsys, monkeypatch) -> None:
+    _force_tty(monkeypatch, 120)
     Renderer(model="test-model").banner()
     out = capsys.readouterr().out
-    assert "██████╗" in out  # wordmark rows rendered
-    # Side-by-side layout: tagline shares a line with wordmark art.
-    assert any(
-        "██" in line and "An autonomous coding agent." in line
-        for line in out.splitlines()
-    )
-    assert "test-model" in out
+    # Wordmark plus compact rounded metadata panel.
+    assert "██████╗" in out
+    assert "╭" in out and "╰" in out
+    for label in ("MODEL", "WORKDIR", "MODE", "STATUS"):
+        assert label in out
+    assert "test-model" in out  # active model is visible
+    assert "~/Documents" in out or "/" in out  # working directory shown
+    assert "normal · approval auto" in out
+    assert "● ready" in out
 
 
-def test_banner_stacks_info_on_medium_terminals(capsys, monkeypatch) -> None:
-    import cli.renderer as renderer_module
-
-    monkeypatch.setattr(renderer_module.console, "_width", 95)
-    monkeypatch.setattr(renderer_module.console, "_force_terminal", True)
+def test_banner_renders_panel_on_medium_terminals(capsys, monkeypatch) -> None:
+    _force_tty(monkeypatch, 95)
     Renderer(model="test-model").banner()
     out = capsys.readouterr().out
     assert "██████╗" in out  # full wordmark still rendered
-    # Stacked layout: no line mixes art with session info.
-    assert not any(
-        "██" in line and "An autonomous coding agent." in line
-        for line in out.splitlines()
-    )
-    assert "An autonomous coding agent." in out
+    for label in ("MODEL", "WORKDIR", "MODE", "STATUS"):
+        assert label in out
+    assert "test-model" in out
+
+
+def test_banner_highlights_plan_mode_in_panel(capsys, monkeypatch) -> None:
+    _force_tty(monkeypatch, 100)
+    Renderer(model="test-model", plan_mode=True).banner()
+    out = capsys.readouterr().out
+    assert "plan · approval auto" in out
+    assert "normal" not in out
+
+
+def test_banner_no_color_strips_styling(capsys, monkeypatch) -> None:
+    import cli.renderer as renderer_module
+
+    _force_tty(monkeypatch, 120)
+    monkeypatch.setattr(renderer_module.console, "no_color", True)
+    Renderer(model="test-model").banner()
+    out = capsys.readouterr().out
+    assert "\x1b[" not in out  # no ANSI escapes under NO_COLOR
+    assert "REFLEX CODE" in out.replace("\n", "") or "██████╗" in out
+    assert "● ready" in out
 
 
 def test_gradient_hex_interpolates_between_anchors() -> None:
