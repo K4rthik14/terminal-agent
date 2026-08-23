@@ -85,3 +85,56 @@ def test_banner_mentions_identity(capsys) -> None:
     assert "REFLEX CODE" in out
     assert "An autonomous coding agent." in out
     assert "test-model" in out
+
+
+def test_banner_renders_gradient_wordmark_when_wide(capsys, monkeypatch) -> None:
+    import cli.renderer as renderer_module
+
+    monkeypatch.setattr(renderer_module.console, "_width", 120)
+    monkeypatch.setattr(renderer_module.console, "_force_terminal", True)
+    Renderer(model="test-model").banner()
+    out = capsys.readouterr().out
+    assert "██████╗" in out  # wordmark rows rendered
+    # Side-by-side layout: tagline shares a line with wordmark art.
+    assert any(
+        "██" in line and "An autonomous coding agent." in line
+        for line in out.splitlines()
+    )
+    assert "test-model" in out
+
+
+def test_banner_stacks_info_on_medium_terminals(capsys, monkeypatch) -> None:
+    import cli.renderer as renderer_module
+
+    monkeypatch.setattr(renderer_module.console, "_width", 95)
+    monkeypatch.setattr(renderer_module.console, "_force_terminal", True)
+    Renderer(model="test-model").banner()
+    out = capsys.readouterr().out
+    assert "██████╗" in out  # full wordmark still rendered
+    # Stacked layout: no line mixes art with session info.
+    assert not any(
+        "██" in line and "An autonomous coding agent." in line
+        for line in out.splitlines()
+    )
+    assert "An autonomous coding agent." in out
+
+
+def test_gradient_hex_interpolates_between_anchors() -> None:
+    from cli.renderer import _gradient_hex
+
+    assert _gradient_hex(0.0) == "#22d3ee"
+    assert _gradient_hex(1.0) == "#a855f7"
+    middle = _gradient_hex(0.5)
+    assert middle not in {"#22d3ee", "#a855f7"}
+
+
+def test_banner_falls_back_to_compact_when_narrow(capsys, monkeypatch) -> None:
+    import cli.renderer as renderer_module
+
+    monkeypatch.setattr(renderer_module.console, "_width", 50)
+    monkeypatch.setattr(renderer_module.console, "_force_terminal", True)
+    Renderer(model="test-model").banner()
+    out = capsys.readouterr().out
+    assert "REFLEX CODE" in out
+    assert "██████╗" not in out  # wordmark omitted on narrow terminals
+    assert "test-model" in out
