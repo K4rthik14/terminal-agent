@@ -6,6 +6,7 @@ Responsibilities:
 - Returns confirmation or a ToolError on failure.
 """
 
+from pathlib import Path
 from typing import Any
 
 from tools.base import Tool
@@ -27,7 +28,9 @@ class WriteFileTool(Tool):
 
     def run(self, args: dict[str, Any]) -> ToolResult:
         try:
-            with open(args["path"], "w", encoding="utf-8") as f:
+            path = Path(args["path"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(args["content"])
             return ToolResult(tool_call_id="", content=f"Wrote {args['path']}")
         except Exception as e:

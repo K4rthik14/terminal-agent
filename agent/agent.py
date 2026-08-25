@@ -14,6 +14,7 @@ from agent.approver import Approver
 from agent.context import AgentContext
 from agent.executor import Executor
 from cli.renderer import Renderer
+from config.defaults import LLM_RETRY_BACKOFF_SECONDS, MAX_LLM_RETRIES
 from config.settings import Settings
 from context.loop import LoopDetector
 from context.metrics import AgentRunMetrics
@@ -26,6 +27,23 @@ from utils.types import ApprovalMode, ToolCall
 from verification.verifier import Verifier
 
 logger = get_logger(__name__)
+
+_TRANSIENT_LLM_MARKERS = (
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "connection error",
+    "record_layer_failure",
+    "sslerror",
+    "timeout",
+    "temporarily unavailable",
+)
+
+
+def _is_transient_llm_error(error: LLMError) -> bool:
+    """Identify transport failures that are safe to retry."""
+    message = str(error).lower()
+    return any(marker in message for marker in _TRANSIENT_LLM_MARKERS)
 
 
 class Agent:
@@ -98,25 +116,34 @@ class Agent:
                 tool_count=len(selection.tool_schemas),
             )
 
-            try:
-                for event in self._llm.stream(selection.messages, selection.tool_schemas):
-                    if event.type == "token":
-                        print(event.content, end="", flush=True)
-                        reply += event.content
-                    elif event.type == "tool_call_delta":
-                        idx = event.tool_call_index
-                        while len(tool_calls) <= idx:
-                            tool_calls.append(ToolCall(id="", name=""))
-                        tc = tool_calls[idx]
-                        tc.id += event.tool_call_id
-                        tc.name += event.tool_call_name
-                        tc.arguments += event.content
-                    elif event.type == "done":
-                        finish_reason = event.finish_reason
-            except LLMError as e:
-                print(f"\nLLM error: {e}")
-                metrics.finish(False)
-                return f"Error: {e}"
+            retry_count = 0
+            while True:
+                try:
+                    for event in self._llm.stream(selection.messages, selection.tool_schemas):
+                        if event.type == "token":
+                            print(event.content, end="", flush=True)
+                            reply += event.content
+                        elif event.type == "tool_call_delta":
+                            idx = event.tool_call_index
+                            while len(tool_calls) <= idx:
+                                tool_calls.append(ToolCall(id="", name=""))
+                            tc = tool_calls[idx]
+                            tc.id += event.tool_call_id
+                            tc.name += event.tool_call_name
+                            tc.arguments += event.content
+                        elif event.type == "done":
+                            finish_reason = event.finish_reason
+                    break
+                except LLMError as e:
+                    if retry_count >= MAX_LLM_RETRIES or not _is_transient_llm_error(e):
+                        print(f"\nLLM error: {e}")
+                        metrics.finish(False)
+                        return f"Error: {e}"
+                    retry_count += 1
+                    self._renderer.info(
+                        f"Retrying LLM request ({retry_count}/{MAX_LLM_RETRIES})..."
+                    )
+                    time.sleep(LLM_RETRY_BACKOFF_SECONDS)
 
             print()  # newline after streaming
 
