@@ -1,5 +1,8 @@
 """Unit tests for state-driven context selection."""
 
+from pathlib import Path
+
+from context.builder import ContextBuilder
 from context.conversation import ConversationSelector
 from context.evaluator import ContextEvaluator
 from context.files import RelevantFileSelector
@@ -136,3 +139,20 @@ def test_context_evaluator_reports_selection_metrics() -> None:
     assert evaluation.character_budget_utilization > 0
     assert "context has no active goal" in evaluation.warnings
     assert "context has no available tools" in evaluation.warnings
+
+
+def test_system_prompt_identifies_as_reflex() -> None:
+    prompt = ContextBuilder().build_system_prompt()
+
+    assert "You are Reflex Code" in prompt
+    assert "nanocode" not in prompt.lower()
+
+
+def test_system_prompt_fallback_identifies_as_reflex(tmp_path: Path) -> None:
+    missing = tmp_path / "does-not-exist.md"
+    builder = ContextBuilder(prompt_file=missing)
+
+    prompt = builder.build_system_prompt()
+
+    assert "You are Reflex Code" in prompt
+    assert "nanocode" not in prompt.lower()

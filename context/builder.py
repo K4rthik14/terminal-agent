@@ -31,7 +31,7 @@ class ContextBuilder:
         try:
             return self._prompt_file.read_text(encoding="utf-8").strip()
         except OSError:
-            return "You are nanocode, a terminal coding agent. Be concise and action-oriented."
+            return "You are Reflex Code, a terminal coding agent. Be concise and action-oriented."
 
     def _environment_section(self) -> str:
         try:
