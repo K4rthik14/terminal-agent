@@ -15,6 +15,10 @@ MAX_TOOL_CALLS: int = 100
 MAX_EXECUTION_TIME_SECONDS: float = 300.0
 MAX_LLM_RETRIES: int = 2
 LLM_RETRY_BACKOFF_SECONDS: float = 0.5
+# Hard ceiling for a single LLM request, including time spent streaming the
+# response. Without it a stalled provider connection hangs the agent loop
+# indefinitely (the SDK default is 600s).
+DEFAULT_LLM_TIMEOUT_SECONDS: float = 120.0
 MAX_CONTEXT_MESSAGES: int = 24
 OPENROUTER_MODEL: str = "poolside/laguna-s-2.1:free"
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"

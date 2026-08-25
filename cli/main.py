@@ -76,6 +76,7 @@ def build_llm(settings: Settings) -> LLMClient:
         model=settings.model,
         base_url=settings.base_url,
         max_tokens=settings.max_tokens,
+        timeout=settings.llm_timeout_seconds,
     )
 
 

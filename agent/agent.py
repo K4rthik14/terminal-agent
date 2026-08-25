@@ -36,6 +36,7 @@ _TRANSIENT_LLM_MARKERS = (
     "record_layer_failure",
     "sslerror",
     "timeout",
+    "timed out",  # e.g. SDK "Request timed out." / httpx read timeouts
     "temporarily unavailable",
 )
 

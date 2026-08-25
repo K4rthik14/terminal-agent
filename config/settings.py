@@ -14,6 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from config.defaults import (
     DEFAULT_APPROVAL_MODE,
     DEFAULT_BASE_URL,
+    DEFAULT_LLM_TIMEOUT_SECONDS,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MODEL,
     DEFAULT_PROVIDER,
@@ -48,6 +49,10 @@ class Settings(BaseSettings):
         repr=False,
     )  # Never store or print API keys; supports both generic and OpenRouter names.
     max_tokens: int = 4096
+    llm_timeout_seconds: float = Field(
+        default=DEFAULT_LLM_TIMEOUT_SECONDS,
+        gt=0,
+    )  # Per-request ceiling covering the initial call and stream consumption.
     max_iterations: int = MAX_ITERATIONS
     max_tool_calls: int = MAX_TOOL_CALLS
     max_execution_time_seconds: float = MAX_EXECUTION_TIME_SECONDS

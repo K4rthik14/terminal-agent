@@ -12,7 +12,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from config.defaults import OPENROUTER_BASE_URL
+from config.defaults import DEFAULT_LLM_TIMEOUT_SECONDS, OPENROUTER_BASE_URL
 from llm.base import LLMClient
 from llm.streaming import parse_openai_stream
 from utils.errors import LLMError
@@ -26,11 +26,15 @@ class OpenAIClient(LLMClient):
         model: str,
         base_url: str | None = OPENROUTER_BASE_URL,
         max_tokens: int = 4096,
+        timeout: float | None = DEFAULT_LLM_TIMEOUT_SECONDS,
         app_name: str | None = None,
         site_url: str | None = None,
     ):
         self._model = model
         self._max_tokens = max_tokens
+        # Explicit ceiling for the whole request lifecycle: connection, time to
+        # first byte, and each read gap while streaming. None keeps the SDK default.
+        self._timeout = timeout
 
         default_headers: dict[str, str] = {
             "Authorization": f"Bearer {api_key}",
@@ -44,6 +48,7 @@ class OpenAIClient(LLMClient):
             api_key=api_key,
             base_url=base_url,
             default_headers=default_headers or None,
+            timeout=self._timeout,
         )
 
     def stream(
