@@ -30,5 +30,8 @@ DEFAULT_APPROVAL_MODE: str = "auto"
 DEFAULT_VERIFICATION_COMMAND: str = ""
 DEFAULT_VERIFICATION_TIMEOUT_SECONDS: int = 30
 RESERVED_TOOL_NAMES: frozenset[str] = frozenset({"task"})
+# Maximum nesting level of sub-agent delegation (parent = depth 0). A sub-agent
+# already at this depth gets an error result instead of spawning another child.
+MAX_SUBAGENT_DEPTH: int = 2
 AGENT_INSTRUCTIONS_FILE: str = "NANOCODE.md"
 DEFAULT_RLM_ENABLED: bool = False
