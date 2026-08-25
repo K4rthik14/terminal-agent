@@ -9,10 +9,12 @@ class FakeAgent:
     def __init__(self, role: AgentRole) -> None:
         self.role = role
         self.last_run_metrics = AgentRunMetrics()
-        self.context_ids: list[int] = []
+        # Hold the context objects themselves: comparing id() of garbage-collected
+        # contexts is unreliable because CPython may recycle addresses.
+        self.contexts: list[object] = []
 
     def run(self, prompt: str, context=None) -> str:
-        self.context_ids.append(id(context))
+        self.contexts.append(context)
         self.last_run_metrics.finish(True)
         return f"{self.role.value}: {prompt}"
 
@@ -62,7 +64,7 @@ def test_coordinator_isolates_context_per_task_and_aggregates_results() -> None:
     assert result.success is True
     assert len(result.results) == 2
     assert len(agents) == 2
-    assert agents[0].context_ids[0] != agents[1].context_ids[0]
+    assert agents[0].contexts[0] is not agents[1].contexts[0]
     assert "planner: Plan the change" in result.output
     assert "executor: Run the tests" in result.output
 

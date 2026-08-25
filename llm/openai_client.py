@@ -51,7 +51,13 @@ class OpenAIClient(LLMClient):
         messages: MessageList,
         tool_schemas: list[dict[str, Any]],
     ) -> Iterator[StreamEvent]:
-        """Stream a response from the OpenAI-compatible API, yielding StreamEvent objects."""
+        """Stream a response from the OpenAI-compatible API, yielding StreamEvent objects.
+
+        Transport failures raised while creating the request or while iterating
+        the response stream are normalized to LLMError (preserving the original
+        message for transient-error classification), so the bounded retry path
+        handles both instead of leaking raw SDK exceptions.
+        """
         try:
             kwargs: dict[str, Any] = dict(
                 model=self._model,
@@ -63,7 +69,8 @@ class OpenAIClient(LLMClient):
                 kwargs["tools"] = tool_schemas
 
             raw_stream = self._client.chat.completions.create(**kwargs)
+            yield from parse_openai_stream(raw_stream)
+        except LLMError:
+            raise
         except Exception as exc:
             raise LLMError(f"OpenAI API request failed: {exc}") from exc
-
-        yield from parse_openai_stream(raw_stream)

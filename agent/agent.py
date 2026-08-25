@@ -118,6 +118,12 @@ class Agent:
 
             retry_count = 0
             while True:
+                # Each retry attempt starts from a clean slate: a partially
+                # consumed stream must not leak tokens or tool-call deltas
+                # into the retried response.
+                reply = ""
+                tool_calls = []
+                finish_reason = None
                 try:
                     for event in self._llm.stream(selection.messages, selection.tool_schemas):
                         if event.type == "token":
