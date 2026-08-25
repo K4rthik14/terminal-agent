@@ -23,7 +23,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["agent", "llm", "tools", "memory", "config", "cli", "utils", "context", "evaluation", "orchestration", "verification"]
+# Every real first-party package shipped in the wheel. Keep in sync with
+# tests/unit/test_packaging.py.
+packages = ["agent", "cli", "config", "context", "evals", "llm", "memory", "orchestration", "rlm", "tools", "utils", "verification"]
 
 [dependency-groups]
 dev = [
