@@ -16,7 +16,6 @@ EXPECTED_PACKAGES = {
     "context",
     "evals",
     "llm",
-    "memory",
     "orchestration",
     "rlm",
     "tools",
