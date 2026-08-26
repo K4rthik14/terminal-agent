@@ -1,9 +1,0 @@
-Skipping image OS validation for alexgshaw/pytorch-model-recovery:20251031: docker inspect returned 1
-Trial pytorch-model-recovery__T6iBCSV failed: Docker compose command failed for environment pytorch-model-recovery. Command: docker compose --project-name pytorch-model-recovery__t6ibcsv__env --project-directory /home/karthik/.cache/harbor/tasks/packages/terminal-bench/pytorch-model-recovery/3164b409d3d9706c2b9a78966f6a16775229f289f076559c1a60102db820ed95/environment -f /tmp/tmpfl2t8jn8/pytorch-model-recovery__T6iBCSV__env-docker-compose-resources.json -f /home/karthik/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/environments/docker/docker-compose-prebuilt.yaml -f /tmp/tmpj_ple84v/docker-compose-environment.json -f /tmp/tmpocod65y7/docker-compose-mounts.json up --detach --wait. Return code: 1. Stdout:  Image alexgshaw/pytorch-model-recovery:20251031 Pulling 
- d2fa770575f8 Pulling fs layer 0B
- f82b85998d24 Pulling fs layer 0B
- 6173fd1b5c8a Pulling fs layer 0B
- c2e82dc171cf Pulling fs layer 0B
-failed to copy: httpReadSeeker: failed open: failed to do request: Get "https://registry-1.docker.io/v2/alexgshaw/pytorch-model-recovery/blobs/sha256:6173fd1b5c8a9d45c1bb047294fbf5f2c1d5f7f0579ba44ce00739b533e78794": net/http: timeout awaiting response headers
-. Stderr: None. 
-Collecting main service artifacts

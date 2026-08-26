@@ -1,3 +1,0 @@
-Skipping image OS validation for alexgshaw/password-recovery:20251031: docker inspect returned 1
-Trial password-recovery__w7b4mhj failed: Environment start timed out after 600.0 seconds
-Collecting main service artifacts
