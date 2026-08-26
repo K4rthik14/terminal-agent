@@ -8,7 +8,7 @@ Reflex Code is an experimental AI coding agent focused on context engineering, r
 
 ## Demo
 
-<!-- Add your demo video/GIF here -->
+![Reflex Code demo](docs/assets/demo.png)
 
 ---
 

@@ -20,5 +20,3 @@ Reflex Code is a modular terminal coding agent. This file is a short map; `ARCHI
 ## Dependency Rules
 
 Dependencies flow inward: `tools/`, `llm/`, `context/` depend on `utils/` and `config/`; they do not import each other or the agent. Two pragmatic exceptions exist in v0.1: `agent/agent.py` imports `cli.renderer.Renderer` for display injection, and `evals/runner.py` reuses the CLI composition helpers (`build_agent`, `build_registry`) so evaluations construct agents exactly like production. Nothing in `llm/` or `tools/` imports from `agent/`.
-
-See `decisions/` for rationale behind major design choices.

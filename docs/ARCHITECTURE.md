@@ -219,7 +219,6 @@ Ruff and strict mypy are configured in `pyproject.toml` but their current baseli
 | `MultiAgentCoordinator` (Planner/Executor/Reviewer/Researcher) | Standalone library API; not constructed by CLI |
 | Evaluation harness (`evals/`) | Standalone CLI (`python -m evals.runner`); not an interactive mode |
 | planning logic in `agent/planner.py` | Incomplete/placeholder; plan mode currently blocks writes and changes the prompt |
-| persistent memory (`memory/`) | Not part of the demonstrated default flow |
 
 The source-level composition in `cli/main.py` is the reliable description of the live product.
 
