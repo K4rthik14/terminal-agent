@@ -1,10 +1,10 @@
-# Terminal-Agent Architecture (Current State)
+# Reflex Code Architecture (v0.1.0)
 
 This document describes the implementation that exists today. It intentionally distinguishes code that is executed by the normal CLI runtime from components that are currently libraries, experiments, or test targets.
 
 ## 1. System boundary and runtime flow
 
-The production entry point is `cli.main:main` (also exposed as `nanocode` and `agent` in `pyproject.toml`). It creates an OpenAI-compatible client, registers tools, creates one `Agent`, and then runs either a single prompt or the REPL.
+The production entry point is `cli.main:main` (exposed as `reflex`, with legacy aliases `trace`, `nanocode`, and `agent` in `pyproject.toml`). It creates an OpenAI-compatible client (with a configurable per-request timeout), registers tools, creates one `Agent`, and then runs either a single prompt or the REPL.
 
 ```mermaid
 flowchart TD
@@ -12,13 +12,15 @@ flowchart TD
     CLI --> S[Settings]
     CLI --> R[ToolRegistry]
     CLI --> A[Agent]
-    A --> C[AgentContext]
-    A --> L[LLMClient.stream]
+    A --> C[AgentContext / context pipeline]
+    C -->|messages + tool schemas| L[LLMClient.stream]
     L -->|tokens and tool-call deltas| A
     A --> LD[LoopDetector]
     A --> E[Executor]
     E --> AP[Approver]
     E --> T[Tool implementation]
+    T -.->|task tool| SUB[SubAgentTool -> child Agent]
+    E --> V[Verifier - opt-in via AGENT_VERIFICATION_COMMAND]
     T --> E
     E --> A
     A -->|final text| U
@@ -147,7 +149,24 @@ It does not record model latency, token usage, individual tool duration, approva
 
 `verification.Verifier` is a deterministic standalone component. `verify_command()` runs a shell command with captured output and a timeout, passing only on exit code zero. It handles empty commands, timeouts, and `OSError`; `verify_test()` is the same check labeled as a test.
 
-The verifier is not injected into `Agent`, `Executor`, `SubAgentTool`, or the CLI. No normal agent iteration automatically runs tests or verifies a proposed change. It is therefore an available building block rather than an active post-tool or post-run verification phase.
+Since the v0.1 hardening pass, the verifier **is** wired into the runtime when configured: setting `AGENT_VERIFICATION_COMMAND` makes `build_agent` construct a `Verifier`, and `Agent.run` executes that command after every candidate final reply. A failed check appends a repair prompt to the context and continues the loop (bounded by `max_iterations`); a pass (or no configured command) completes the run normally. With the default empty command, no verifier is constructed and behavior is unchanged.
+
+## 8b. LLM reliability
+
+- **Transient retries**: request-time transport failures classified by message markers (`connection reset`, `sslerror`, `timeout`, `timed out`, ...) are retried up to `MAX_LLM_RETRIES` (2) with backoff. Permanent provider errors (e.g. HTTP 400/401) are never retried.
+- **Streaming failures**: stream iteration happens inside the same error boundary as request creation in `OpenAIClient.stream()`, so mid-stream transport failures are normalized to `LLMError` and enter the same transient path.
+- **Per-attempt reset**: on retry, the agent discards partially streamed tokens and tool-call fragments so an aborted attempt cannot corrupt the retried response.
+- **Timeout**: `OpenAIClient` passes `AGENT_LLM_TIMEOUT_SECONDS` (default 120s) to the SDK, bounding connection, time-to-first-byte, and read gaps while streaming. Timeout errors match the transient markers and are retried.
+
+## 8c. Sub-agent delegation
+
+The `task` tool (`tools/sub_agent.py`) spawns a child `Agent` through the injected factory: fresh isolated `AgentContext`, its own registry (including approval rules), own loop detector and metrics. The child's final reply returns to the parent as an ordinary tool result; child tool errors are contained inside the child loop, and child LLM failures return `"Error: ..."` text instead of raising into the parent.
+
+Delegation nesting is capped: `SUBAGENT_DEPTH` tracks the executing depth and `MAX_SUBAGENT_DEPTH` (2) refuses further delegation with an error result, so recursive `task()` calls cannot become unbounded.
+
+## 8d. RLM pre-execution reasoning (experimental)
+
+`rlm.controller.RLMController` is an opt-in bounded reasoning phase for one-shot prompts (`AGENT_RLM_ENABLED=1`, off by default). It exposes only read-only tools via `ReadOnlyRegistry`, allows at most 8 tool-turns to inspect the workspace, and prepends the resulting "execution brief" to the prompt sent to the main agent. If the phase errors or exhausts its iteration budget it degrades safely: the original task runs unchanged. There is currently no measured evidence that the brief improves task success; the feature ships as experimental scaffolding, not a self-improvement system. It applies only to `--prompt` one-shot mode, not interactive sessions.
 
 ## 9. Multi-agent coordination
 
@@ -155,31 +174,35 @@ The verifier is not injected into `Agent`, `Executor`, `SubAgentTool`, or the CL
 
 Despite the conceptual names in README material, the coordinator does not currently implement parallel execution, shared memory, inter-agent messaging, review/merge protocols, or planner/reviewer/researcher workflows. The CLI does not construct a `MultiAgentCoordinator`. Sub-agent behavior is exposed separately through the registered sub-agent tool, so that tool is the practical delegation hook in the default runtime, while the coordinator remains a reusable orchestration API.
 
-## 10. EvaluationHarness
+## 10. Evaluation harness
 
-`evaluation.EvaluationHarness` accepts either an agent factory or a runner and executes `EvaluationTask`s sequentially with isolated agent instances/runs. It collects each output and `AgentRunMetrics` into an `EvaluationReport`; an exception in one task is recorded as a failed result instead of stopping the complete harness.
+`evals/` is a small evaluation harness with a CLI: `python -m evals.runner [--tasks-dir DIR] [--results-dir DIR] [--no-approval]`. Tasks are JSON files (prompt + verification command) in `evals/tasks/`; the runner executes each task with a fresh agent in an isolated temporary workspace, judges pass/fail by the verification command's exit code (`evals/judge.py`), records duration and failure type, and persists `results.json` plus aggregate metrics (`evals/metrics.py`).
 
-The harness does not compare output to expected answers, invoke `Verifier`, score task correctness, parallelize tasks, or persist reports. It is an execution-and-metrics harness, not yet a benchmark evaluator.
+The built-in suite contains **15 tasks**. The last recorded full run (`evals/results/results.json`, dated before the final v0.1 hardening commits) shows **12 passed / 3 failed**. The suite is small and results predate later changes; treat them as a harness demonstration rather than a benchmark.
+
+The harness does not compare output to expected answers beyond verification commands, does not parallelize tasks, and has no regression tracking yet.
 
 ## 11. Tests and validation today
 
-The repository has pytest configuration in `pyproject.toml` and focused unit tests under `tests/unit`:
+The repository has pytest configuration in `pyproject.toml`; as of v0.1.0 there are 21 focused unit test modules under `tests/unit` (**173 tests passing**), covering:
 
-- `test_context_pipeline.py`: state/context selectors and prompt construction;
-- `test_execution_optimization.py`: loop detection, scheduling, and metrics-related execution behavior;
-- `test_multi_agent_coordinator.py`: coordinator routing/isolation/results;
-- `test_evaluation_harness.py`: isolated evaluation runs and failure handling;
-- `test_verification.py`: deterministic command/test verification.
+- agent loop budgets, verification loop, LLM retry/timeout behavior (`test_execution_budget.py`, `test_agent_verification.py`, `test_llm_retry.py`, `test_llm_timeout.py`);
+- CLI wiring and errors (`test_cli_errors.py`, `test_model_config.py`, `test_api_key_config.py`, `test_verification_config.py`, `test_cli_rlm_integration.py`);
+- context pipeline, execution optimization, renderer (`test_context_pipeline.py`, `test_execution_optimization.py`, `test_renderer.py`);
+- approval semantics (`test_approver.py`);
+- sub-agent delegation incl. depth cap (`test_sub_agent_delegation.py`);
+- RLM controller (`test_rlm_controller.py`);
+- coordinator, evals, verification, packaging (`test_multi_agent_coordinator.py`, `test_evals.py`, `test_verification.py`, `test_packaging.py`).
 
-`tests/integration` currently contains only package initialization, so there is no end-to-end CLI/provider integration suite. The tests primarily validate the standalone modules and fakes, not a live LLM-to-tool workflow.
+`tests/integration` currently contains only package initialization, so there is no automated end-to-end CLI/provider integration suite. Live provider behavior was verified manually during release hardening.
 
 A useful local validation command is:
 
 ```bash
-pytest
+uv run pytest
 ```
 
-The project also declares Ruff and strict mypy development tooling, but the repository configuration alone does not mean those checks are run automatically.
+Ruff and strict mypy are configured in `pyproject.toml` but their current baselines still contain known findings (ruff ~58, mypy ~166); they are not clean gates yet. Packaging is covered by `test_packaging.py`: the wheel ships all twelve first-party packages including `rlm` and `evals`.
 
 ## 12. Integrated versus standalone
 
@@ -187,15 +210,18 @@ The project also declares Ruff and strict mypy development tooling, but the repo
 |---|---|
 | `Agent` loop, `AgentContext`, `LLMClient`, registry, executor, approval | Integrated |
 | Context selectors, `PromptOrchestrator`, `PromptBuilder`, tool scheduling | Integrated through `AgentContext.select_context()` |
-| Loop detection and basic run metrics | Integrated |
+| Loop detection, run metrics, execution budgets | Integrated |
+| Transient retries, streaming-failure handling, request timeout | Integrated |
+| `SubAgentTool` delegation with depth cap | Integrated via the registered `task` tool |
+| `Verifier` check-and-repair loop | Opt-in; wired when `AGENT_VERIFICATION_COMMAND` is set |
+| RLM pre-execution brief | Experimental, opt-in (`AGENT_RLM_ENABLED`); one-shot mode only |
 | `ContextEvaluator` diagnostics | Standalone; not called by the agent |
-| `Verifier` | Standalone; not called after tools or runs |
-| `MultiAgentCoordinator` | Standalone API; not constructed by CLI |
-| `EvaluationHarness` | Standalone API; not a CLI mode |
+| `MultiAgentCoordinator` (Planner/Executor/Reviewer/Researcher) | Standalone library API; not constructed by CLI |
+| Evaluation harness (`evals/`) | Standalone CLI (`python -m evals.runner`); not an interactive mode |
 | planning logic in `agent/planner.py` | Incomplete/placeholder; plan mode currently blocks writes and changes the prompt |
 | persistent memory (`memory/`) | Not part of the demonstrated default flow |
 
-The README describes a broader architecture than the current composition root actually wires together. The source-level composition in `cli/main.py` is the reliable description of the live product.
+The source-level composition in `cli/main.py` is the reliable description of the live product.
 
 ## 13. Strengths, weaknesses, and technical debt
 
