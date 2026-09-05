@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from rlm.controller import RLMController, ReadOnlyRegistry, RLMResult
+from rlm.controller import ReadOnlyRegistry, RLMController, RLMResult
 from tools.base import Tool
 from tools.registry import ToolRegistry
 from utils.types import StreamEvent, ToolResult
@@ -293,6 +293,7 @@ class TestErrorHandling:
         # Should not raise — returns a result with whatever was accumulated
         assert isinstance(result, RLMResult)
         assert result.brief == ""
+        assert result.degraded is True
 
     def test_tool_execution_error_does_not_crash(self) -> None:
         failing_tool = FailingReadOnlyTool()

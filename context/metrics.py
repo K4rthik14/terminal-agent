@@ -24,6 +24,11 @@ class AgentRunMetrics:
     verification_passes: int = 0
     verification_failures: int = 0
     verification_errors: int = 0
+    rlm_enabled: bool = False
+    rlm_iterations: int = 0
+    rlm_tool_calls: int = 0
+    rlm_brief_chars: int = 0
+    rlm_degraded: bool = False
     _started_at: float = field(default_factory=time.monotonic, repr=False)
 
     def finish(self, success: bool) -> None:

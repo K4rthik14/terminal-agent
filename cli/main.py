@@ -22,7 +22,7 @@ from cli.repl import Repl
 from config.settings import API_KEY_ENV_VARS, MODEL_ENV_VAR, Settings
 from llm.base import LLMClient
 from llm.openai_client import OpenAIClient
-from rlm.controller import RLMController
+from rlm.controller import RLMController, RLMResult
 from tools.bash import BashTool
 from tools.file_edit import EditFileTool
 from tools.file_read import ReadFileTool
@@ -106,12 +106,15 @@ def build_agent(
     )
 
 
-def build_effective_prompt(prompt: str, rlm_controller: RLMController | None = None) -> str:
+def build_effective_prompt(
+    prompt: str,
+    rlm_controller: RLMController | None = None,
+    rlm_result: RLMResult | None = None,
+) -> str:
     """Optionally prepend a bounded RLM execution brief to one prompt."""
-    if rlm_controller is None:
-        return prompt
-    rlm_result = rlm_controller.run(prompt)
-    if not rlm_result.brief:
+    if rlm_result is None and rlm_controller is not None:
+        rlm_result = rlm_controller.run(prompt)
+    if rlm_result is None or not rlm_result.brief:
         return prompt
     return f"Execution brief:\n{rlm_result.brief}\n\nNow execute the task: {prompt}"
 
@@ -276,7 +279,12 @@ def main() -> None:
             rlm_controller = (
                 RLMController(llm=llm, registry=registry) if settings.rlm_enabled else None
             )
-            agent.run(build_effective_prompt(args.prompt, rlm_controller), context=context)
+            rlm_result = rlm_controller.run(args.prompt) if rlm_controller is not None else None
+            agent.run(
+                build_effective_prompt(args.prompt, rlm_result=rlm_result),
+                context=context,
+                rlm_result=rlm_result,
+            )
         else:
             # Interactive REPL
             context = AgentContext(

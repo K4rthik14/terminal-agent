@@ -21,6 +21,11 @@ def test_run_metrics_records_execution_data() -> None:
     assert metrics.execution_time >= 0
     assert metrics.tool_usage == {"read_file": 2}
     assert metrics.context_message_counts == [2]
+    assert metrics.rlm_enabled is False
+    assert metrics.rlm_iterations == 0
+    assert metrics.rlm_tool_calls == 0
+    assert metrics.rlm_brief_chars == 0
+    assert metrics.rlm_degraded is False
 
 
 def test_loop_detector_blocks_repeated_identical_calls() -> None:

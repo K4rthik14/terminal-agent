@@ -20,6 +20,7 @@ from context.loop import LoopDetector
 from context.metrics import AgentRunMetrics
 from context.window import MessageWindow
 from llm.base import LLMClient
+from rlm.controller import RLMResult
 from tools.registry import ToolRegistry
 from utils.errors import LLMError
 from utils.logging import get_logger
@@ -65,7 +66,12 @@ class Agent:
         self._verification_command = verification_command
         self.last_run_metrics = AgentRunMetrics()
 
-    def run(self, prompt: str, context: AgentContext | None = None) -> str:
+    def run(
+        self,
+        prompt: str,
+        context: AgentContext | None = None,
+        rlm_result: RLMResult | None = None,
+    ) -> str:
         """
         Run a single user prompt to completion. Returns the final text reply.
         If context is None, a fresh context is created (used by sub-agents and single-shot mode).
@@ -84,6 +90,12 @@ class Agent:
         executor = Executor(self._registry, approver, plan_mode=context.plan_mode)
         loop_detector = LoopDetector()
         metrics = AgentRunMetrics()
+        if rlm_result is not None:
+            metrics.rlm_enabled = True
+            metrics.rlm_iterations = rlm_result.iterations
+            metrics.rlm_tool_calls = len(rlm_result.tool_calls)
+            metrics.rlm_brief_chars = len(rlm_result.brief)
+            metrics.rlm_degraded = rlm_result.degraded
         self.last_run_metrics = metrics
         started_at = time.monotonic()
         reply = ""

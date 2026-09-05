@@ -18,11 +18,10 @@ from typing import Any
 
 from context.builder import ContextBuilder
 from llm.base import LLMClient
-from tools.base import Tool
 from tools.registry import ToolRegistry
 from utils.errors import LLMError
 from utils.logging import get_logger
-from utils.types import StreamEvent, ToolCall, ToolResult
+from utils.types import ToolCall, ToolResult
 
 logger = get_logger(__name__)
 
@@ -63,6 +62,7 @@ class RLMResult:
     brief: str
     iterations: int
     tool_calls: list[ToolCall] = field(default_factory=list)
+    degraded: bool = False
 
     @property
     def tool_names(self) -> list[str]:
@@ -112,7 +112,7 @@ class RLMController:
         all_tool_calls: list[ToolCall] = []
 
         for iteration in range(self._max_iterations):
-            reply, tool_calls, finish_reason = self._stream_one_turn(
+            reply, tool_calls, finish_reason, degraded = self._stream_one_turn(
                 messages, tool_schemas
             )
             all_tool_calls.extend(tool_calls)
@@ -123,6 +123,7 @@ class RLMController:
                     brief=reply.strip(),
                     iterations=iteration + 1,
                     tool_calls=all_tool_calls,
+                    degraded=degraded or not reply.strip(),
                 )
 
             # Append assistant message with tool calls to conversation
@@ -166,6 +167,7 @@ class RLMController:
             brief=str(last_assistant.get("content", "")).strip(),
             iterations=self._max_iterations,
             tool_calls=all_tool_calls,
+            degraded=True,
         )
 
     # -- internal helpers ---------------------------------------------------
@@ -179,14 +181,15 @@ class RLMController:
         self,
         messages: list[dict[str, Any]],
         tool_schemas: list[dict[str, Any]],
-    ) -> tuple[str, list[ToolCall], str | None]:
+    ) -> tuple[str, list[ToolCall], str | None, bool]:
         """Stream one LLM turn, accumulating reply text and tool calls.
 
-        Returns (reply_text, tool_calls, finish_reason).
+        Returns (reply_text, tool_calls, finish_reason, degraded).
         """
         reply = ""
         tool_calls: list[ToolCall] = []
         finish_reason: str | None = None
+        degraded = False
 
         try:
             for event in self._llm.stream(messages, tool_schemas):
@@ -205,9 +208,9 @@ class RLMController:
         except LLMError as exc:
             logger.error("LLM error during RLM phase: %s", exc)
             # Treat as a terminal state — return what we have
-            return reply, tool_calls, None
+            return reply, tool_calls, None, True
 
-        return reply, tool_calls, finish_reason
+        return reply, tool_calls, finish_reason, degraded
 
     def _execute_read_only(self, tool_call: ToolCall) -> ToolResult:
         """Execute a single read-only tool call.  Never raises."""

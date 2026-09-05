@@ -3,10 +3,10 @@
 from types import SimpleNamespace
 
 from agent.agent import Agent
-
+from rlm.controller import RLMResult
 from tools.base import Tool
 from tools.registry import ToolRegistry
-from utils.types import StreamEvent, ToolResult
+from utils.types import StreamEvent, ToolCall, ToolResult
 
 
 class FakeLLM:
@@ -184,6 +184,26 @@ def test_end_to_end_tool_execution_failure_repair_and_pass() -> None:
     assert metrics.verification_passes == 1
     assert metrics.verification_errors == 1
     assert metrics.tool_usage == {"write_file": 1}
+
+
+def test_rlm_result_is_recorded_in_agent_metrics() -> None:
+    llm = FakeLLM([done()])
+    agent = Agent(llm, ToolRegistry(), settings())
+    rlm_result = RLMResult(
+        brief="brief text",
+        iterations=2,
+        tool_calls=[ToolCall(id="call_1", name="read_file")],
+        degraded=True,
+    )
+
+    assert agent.run("fix it", rlm_result=rlm_result) == "done"
+
+    metrics = agent.last_run_metrics
+    assert metrics.rlm_enabled is True
+    assert metrics.rlm_iterations == 2
+    assert metrics.rlm_tool_calls == 1
+    assert metrics.rlm_brief_chars == len("brief text")
+    assert metrics.rlm_degraded is True
 
 
 def test_no_verifier_preserves_immediate_completion() -> None:
