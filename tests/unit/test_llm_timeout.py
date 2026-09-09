@@ -200,7 +200,7 @@ def test_timeout_error_is_transient_and_retried(monkeypatch: pytest.MonkeyPatch)
     ])
     agent = make_agent(llm, renderer)
 
-    assert agent.run("complete the task") == "recovered"
+    assert agent.run("complete the task").output == "recovered"
     assert llm.calls == 2
     assert renderer.messages == ["Retrying LLM request (1/2)..."]
 
@@ -225,7 +225,7 @@ def test_midstream_read_timeout_recovers_through_agent_retry(
     monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
     agent = make_agent(client, renderer)
 
-    assert agent.run("complete the task") == "recovered"
+    assert agent.run("complete the task").output == "recovered"
     assert seen == 2
     assert renderer.messages == ["Retrying LLM request (1/2)..."]
 
@@ -236,8 +236,9 @@ def test_permanent_error_remains_non_retryable(monkeypatch: pytest.MonkeyPatch) 
     llm = SequenceLLM([LLMError("OpenAI API request failed: Error code: 400 - invalid model")])
     agent = make_agent(llm, renderer)
 
-    reply = agent.run("complete the task")
+    result = agent.run("complete the task")
 
-    assert reply == "Error: OpenAI API request failed: Error code: 400 - invalid model"
+    assert result.success is False
+    assert result.error == "LLM error: OpenAI API request failed: Error code: 400 - invalid model"
     assert llm.calls == 1
     assert renderer.messages == []

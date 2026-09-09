@@ -117,6 +117,6 @@ def test_normal_execution_is_unchanged_when_budget_is_not_reached() -> None:
     llm = FakeLLM([final("complete")])
     agent = make_agent(llm, ToolRegistry())
 
-    assert agent.run("finish") == "complete"
+    assert agent.run("finish").output == "complete"
     assert agent.last_run_metrics.success is True
     assert agent.last_run_metrics.budget_exceeded is False

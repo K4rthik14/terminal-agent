@@ -13,6 +13,7 @@ from contextvars import ContextVar
 from typing import Any
 
 from config.defaults import MAX_SUBAGENT_DEPTH
+from context.metrics import AgentRunResult
 from tools.base import Tool
 from utils.types import ToolResult
 
@@ -57,8 +58,10 @@ class SubAgentTool(Tool):
 
         child_token = SUBAGENT_DEPTH.set(depth + 1)
         try:
-            result = agent.run(args["prompt"])
-            return ToolResult(tool_call_id="", content=result)
+            result: AgentRunResult = agent.run(args["prompt"])
+            if result.success:
+                return ToolResult(tool_call_id="", content=result.output)
+            return ToolResult(tool_call_id="", content=result.error or "", is_error=True)
         except Exception as e:
             return ToolResult(tool_call_id="", content=f"Sub-agent error: {e}", is_error=True)
         finally:

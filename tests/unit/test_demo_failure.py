@@ -88,12 +88,13 @@ def test_demo_write_and_independent_ssl_failure_are_handled_safely(tmp_path, mon
     llm = DemoFailureLLM()
     agent = Agent(llm, registry, _settings(), renderer=QuietRenderer())
 
-    reply = agent.run("Build a landing page in demo")
+    result = agent.run("Build a landing page in demo")
 
-    assert "RECORD_LAYER_FAILURE" in reply
+    assert result.success is False
+    assert "RECORD_LAYER_FAILURE" in (result.error or "")
     assert len(llm.requests) == 4
     second_messages = llm.requests[1][0]
     tool_result = next(message for message in second_messages if message.get("role") == "tool")
     assert tool_result["tool_call_id"] == "write-1"
     assert "Wrote demo/site/index.html" in tool_result["content"]
-    assert "Retrying" not in reply
+    assert "Retrying" not in (result.error or "")

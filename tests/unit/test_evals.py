@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from agent.approver import Approver
+from context.metrics import AgentRunMetrics, AgentRunResult, AgentRunStatus
 from evals import judge, metrics, runner
 from utils.types import ApprovalMode
 
@@ -20,19 +21,25 @@ class FakeAgent:
         self.files = files
         self.prompts: list[str] = []
 
-    def run(self, prompt: str, context=None) -> str:
+    def run(self, prompt: str, context=None) -> AgentRunResult:
         self.prompts.append(prompt)
         for name, content in self.files.items():
             path = Path(name)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
-        return "done"
+        return AgentRunResult(
+            output="done",
+            success=True,
+            error=None,
+            metrics=AgentRunMetrics(),
+            status=AgentRunStatus.SUCCESS,
+        )
 
 
 class SolvingAgent:
     """Solves all three built-in tasks by inspecting the prompt."""
 
-    def run(self, prompt: str, context=None) -> str:
+    def run(self, prompt: str, context=None) -> AgentRunResult:
         if "hello.txt" in prompt:
             Path("hello.txt").write_text("hello\n", encoding="utf-8")
         elif "src" in prompt:
@@ -40,7 +47,13 @@ class SolvingAgent:
             (Path("src") / "README.md").write_text("# my-project\n", encoding="utf-8")
         elif "run.sh" in prompt:
             Path("run.sh").write_text("#!/bin/sh\necho done\n", encoding="utf-8")
-        return "done"
+        return AgentRunResult(
+            output="done",
+            success=True,
+            error=None,
+            metrics=AgentRunMetrics(),
+            status=AgentRunStatus.SUCCESS,
+        )
 
 
 def passing_agent_factory():
@@ -167,9 +180,51 @@ def test_run_task_records_agent_error() -> None:
     result = runner.run_task(task, lambda: BrokenAgent())
 
     assert result["passed"] is False
+    assert result["agent_success"] is False
     assert result["agent_error"] == "boom"
     assert result["failure_type"] == "llm_error"
     assert result["duration_seconds"] >= 0
+
+
+def test_run_task_distinguishes_agent_execution_failure() -> None:
+    task = {"id": "t1", "prompt": "p", "verification_command": "grep -qx hello hello.txt"}
+
+    class FailedRunAgent:
+        def run(self, prompt: str, context=None) -> AgentRunResult:
+            return AgentRunResult(
+                output="",
+                success=False,
+                error="LLM error: provider down",
+                metrics=AgentRunMetrics(),
+                status=AgentRunStatus.LLM_ERROR,
+            )
+
+    result = runner.run_task(task, lambda: FailedRunAgent())
+
+    assert result["passed"] is False
+    assert result["agent_success"] is False
+    assert result["failure_type"] == "llm_error"
+    assert "provider down" in result["detail"]
+
+
+def test_run_task_distinguishes_judge_failure_after_successful_agent() -> None:
+    task = {"id": "t1", "prompt": "p", "verification_command": "grep -qx hello hello.txt"}
+
+    class SuccessfulRunAgent:
+        def run(self, prompt: str, context=None) -> AgentRunResult:
+            return AgentRunResult(
+                output="done",
+                success=True,
+                error=None,
+                metrics=AgentRunMetrics(),
+                status=AgentRunStatus.SUCCESS,
+            )
+
+    result = runner.run_task(task, lambda: SuccessfulRunAgent())
+
+    assert result["passed"] is False
+    assert result["agent_success"] is True
+    assert result["failure_type"] == "verification_failed"
 
 
 def test_run_tasks_writes_results_json_and_metrics(tmp_path) -> None:

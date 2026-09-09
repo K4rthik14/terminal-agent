@@ -90,7 +90,7 @@ def test_verification_passes_and_agent_completes() -> None:
     verifier = FakeVerifier([result(True)])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="pytest -q")
 
-    assert agent.run("fix it") == "done"
+    assert agent.run("fix it").output == "done"
     assert len(llm.requests) == 1
     assert agent.last_run_metrics.verification_passes == 1
 
@@ -100,7 +100,7 @@ def test_verification_failure_is_added_to_context_and_retries() -> None:
     verifier = FakeVerifier([result(False, error="1 failed") , result(True)])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="pytest -q")
 
-    assert agent.run("fix it") == "second"
+    assert agent.run("fix it").output == "second"
     assert len(llm.requests) == 2
     assert any("Verification failed" in str(message.get("content")) for message in llm.requests[1][0])
     assert agent.last_run_metrics.verification_failures == 1
@@ -111,7 +111,7 @@ def test_verification_eventually_passes_after_repair() -> None:
     verifier = FakeVerifier([result(False, error="failure"), result(False, error="failure"), result(True)])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="pytest -q")
 
-    assert agent.run("fix it") == "complete"
+    assert agent.run("fix it").output == "complete"
     assert agent.last_run_metrics.verification_attempts == 3
 
 
@@ -120,7 +120,7 @@ def test_verification_respects_iteration_limit() -> None:
     verifier = FakeVerifier([result(False, error="failure"), result(False, error="failure")])
     agent = Agent(llm, ToolRegistry(), settings(max_iterations=2), verifier=verifier, verification_command="pytest -q")
 
-    assert agent.run("fix it") == "attempt 2"
+    assert agent.run("fix it").output == "attempt 2"
     assert agent.last_run_metrics.success is False
     assert agent.last_run_metrics.verification_attempts == 2
 
@@ -130,7 +130,7 @@ def test_disabled_verification_preserves_immediate_completion() -> None:
     verifier = FakeVerifier([result(False, error="must not run")])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier)
 
-    assert agent.run("fix it") == "done"
+    assert agent.run("fix it").output == "done"
     assert verifier.commands == []
     assert agent.last_run_metrics.verification_attempts == 0
 
@@ -140,7 +140,7 @@ def test_verification_timeout_is_safe_and_repairable() -> None:
     verifier = FakeVerifier([result(False, error="timed out", timed_out=True), result(True)])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="pytest -q")
 
-    assert agent.run("fix it") == "complete"
+    assert agent.run("fix it").output == "complete"
     assert agent.last_run_metrics.verification_errors == 1
 
 
@@ -162,7 +162,7 @@ def test_end_to_end_tool_execution_failure_repair_and_pass() -> None:
 
     reply = agent.run("fix the failing test")
 
-    assert reply == "proper fix applied"
+    assert reply.output == "proper fix applied"
     assert tool.calls == [{"path": "test_x.py"}]
     assert len(llm.requests) == 3
 
@@ -196,7 +196,7 @@ def test_rlm_result_is_recorded_in_agent_metrics() -> None:
         degraded=True,
     )
 
-    assert agent.run("fix it", rlm_result=rlm_result) == "done"
+    assert agent.run("fix it", rlm_result=rlm_result).output == "done"
 
     metrics = agent.last_run_metrics
     assert metrics.rlm_enabled is True
@@ -210,7 +210,7 @@ def test_no_verifier_preserves_immediate_completion() -> None:
     llm = FakeLLM([done()])
     agent = Agent(llm, ToolRegistry(), settings())
 
-    assert agent.run("fix it") == "done"
+    assert agent.run("fix it").output == "done"
     assert len(llm.requests) == 1
     assert agent.last_run_metrics.success is True
     assert agent.last_run_metrics.verification_attempts == 0
@@ -221,7 +221,7 @@ def test_whitespace_verification_command_is_disabled() -> None:
     verifier = FakeVerifier([result(False, error="must not run")])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="   ")
 
-    assert agent.run("fix it") == "done"
+    assert agent.run("fix it").output == "done"
     assert verifier.commands == []
     assert agent.last_run_metrics.verification_attempts == 0
 
@@ -239,7 +239,7 @@ def test_failed_check_uses_output_detail_when_no_error_reaches_model() -> None:
     verifier = FakeVerifier([failed, result(True)])
     agent = Agent(llm, ToolRegistry(), settings(), verifier=verifier, verification_command="pytest -q")
 
-    assert agent.run("fix it") == "repaired"
+    assert agent.run("fix it").output == "repaired"
     second_messages = llm.requests[1][0]
     assert any("tests failed badly" in str(message.get("content")) for message in second_messages)
     assert agent.last_run_metrics.verification_failures == 1

@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable
 from typing import Protocol
 
 from agent.context import AgentContext
-from context.metrics import AgentRunMetrics
+from context.metrics import AgentRunMetrics, AgentRunResult
 from context.models import ContextState
 from orchestration.models import (
     AgentResult,
@@ -22,7 +22,7 @@ class RoleAgent(Protocol):
 
     last_run_metrics: AgentRunMetrics
 
-    def run(self, prompt: str, context: AgentContext | None = None) -> str:
+    def run(self, prompt: str, context: AgentContext | None = None) -> AgentRunResult:
         """Run one focused task."""
         ...
 
@@ -71,13 +71,13 @@ class MultiAgentCoordinator:
         context = AgentContext(plan_mode=state.plan_mode)
         context.init_system_message()
         try:
-            output = agent.run(task.prompt, context=context)
-            metrics = agent.last_run_metrics
+            result = agent.run(task.prompt, context=context)
             return AgentResult(
                 task=task,
-                output=output,
-                metrics=metrics,
-                success=metrics.success,
+                output=result.output,
+                metrics=result.metrics,
+                success=result.success,
+                error=result.error,
             )
         except Exception as exc:
             metrics = getattr(agent, "last_run_metrics", AgentRunMetrics())

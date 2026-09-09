@@ -68,7 +68,7 @@ def test_transient_ssl_failure_retries_then_succeeds(monkeypatch) -> None:
 
     agent = make_agent(llm, renderer)
 
-    assert agent.run("complete the task") == "recovered"
+    assert agent.run("complete the task").output == "recovered"
     assert llm.calls == 2
     assert renderer.messages == ["Retrying LLM request (1/2)..."]
 
@@ -81,9 +81,10 @@ def test_exhausted_transient_retries_return_clean_error(monkeypatch) -> None:
 
     agent = make_agent(llm, renderer)
 
-    reply = agent.run("complete the task")
+    result = agent.run("complete the task")
 
-    assert reply == "Error: connection reset by peer"
+    assert result.success is False
+    assert result.error == "LLM error: connection reset by peer"
     assert llm.calls == 3
     assert renderer.messages == [
         "Retrying LLM request (1/2)...",
@@ -99,7 +100,9 @@ def test_permanent_llm_error_is_not_retried(monkeypatch) -> None:
 
     agent = make_agent(llm, renderer)
 
-    assert agent.run("complete the task") == "Error: 401 invalid api key"
+    result = agent.run("complete the task")
+    assert result.success is False
+    assert result.error == "LLM error: 401 invalid api key"
     assert llm.calls == 1
     assert renderer.messages == []
 
@@ -196,7 +199,7 @@ def test_openai_client_midstream_failure_recovers_through_agent_retry(
     monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
     agent = make_agent(client, renderer)
 
-    assert agent.run("complete the task") == "recovered"
+    assert agent.run("complete the task").output == "recovered"
     assert seen == 2
     assert renderer.messages == ["Retrying LLM request (1/2)..."]
 
@@ -210,7 +213,7 @@ def test_midstream_transient_failure_is_retried(monkeypatch: pytest.MonkeyPatch)
     ])
     agent = make_agent(llm, renderer)
 
-    assert agent.run("complete the task") == "recovered"
+    assert agent.run("complete the task").output == "recovered"
     assert llm.calls == 2
     assert renderer.messages == ["Retrying LLM request (1/2)..."]
 
@@ -226,9 +229,7 @@ def test_partial_tokens_from_failed_attempt_do_not_leak_into_final_reply(
     ])
     agent = make_agent(llm, renderer)
 
-    reply = agent.run("complete the task")
-
-    assert reply == "final answer"
+    assert agent.run("complete the task").output == "final answer"
     assert agent.last_run_metrics.success is True
 
 
@@ -245,9 +246,10 @@ def test_midstream_retries_exhausted_return_clean_error(
     ])
     agent = make_agent(llm, renderer)
 
-    reply = agent.run("complete the task")
+    result = agent.run("complete the task")
 
-    assert reply == f"Error: {error_text}"
+    assert result.success is False
+    assert result.error == f"LLM error: {error_text}"
     assert llm.calls == 3
     assert renderer.messages == [
         "Retrying LLM request (1/2)...",
@@ -264,6 +266,8 @@ def test_permanent_error_during_stream_is_not_retried(
     llm = SequenceLLM([midstream_failure("OpenAI API request failed: 401 invalid api key")])
     agent = make_agent(llm, renderer)
 
-    assert agent.run("complete the task") == "Error: OpenAI API request failed: 401 invalid api key"
+    result = agent.run("complete the task")
+    assert result.success is False
+    assert result.error == "LLM error: OpenAI API request failed: 401 invalid api key"
     assert llm.calls == 1
     assert renderer.messages == []

@@ -18,6 +18,7 @@ from pathlib import Path
 from agent.agent import Agent
 from cli.main import build_agent, build_registry
 from config.settings import Settings
+from context.metrics import AgentRunResult, AgentRunStatus
 
 from evals import judge, metrics
 
@@ -41,18 +42,29 @@ def run_task(task: dict[str, object], agent_factory: AgentFactory) -> dict[str, 
         os.chdir(workspace)
         started_at = time.monotonic()
         agent_error = None
+        agent_result: AgentRunResult | None = None
         try:
-            agent_factory().run(str(task["prompt"]))
+            agent_result = agent_factory().run(str(task["prompt"]))
         except Exception as exc:  # keep the eval going even if the agent crashes
             agent_error = str(exc)
         passed, detail, failure_type = judge.check_result(str(task["verification_command"]))
         duration_seconds = round(time.monotonic() - started_at, 3)
+        agent_success = agent_error is None and (agent_result is None or agent_result.success)
         if agent_error is not None:
             passed = False
             detail = agent_error
             failure_type = "llm_error"
+        elif agent_result is not None and not agent_result.success:
+            # Structured agent failure: never inferred from output text.
+            passed = False
+            detail = agent_result.error or agent_result.output or "agent execution failed"
+            failure_type = {
+                AgentRunStatus.LLM_ERROR: "llm_error",
+                AgentRunStatus.BUDGET_EXCEEDED: "budget_exceeded",
+            }.get(agent_result.status, "agent_failed")
         record: dict[str, object] = {
             "id": task["id"],
+            "agent_success": agent_success,
             "passed": passed,
             "detail": detail,
             "duration_seconds": duration_seconds,

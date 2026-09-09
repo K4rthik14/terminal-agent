@@ -16,6 +16,7 @@ import pytest
 from agent.agent import Agent
 from agent.context import AgentContext
 from config.defaults import MAX_SUBAGENT_DEPTH
+from context.metrics import AgentRunMetrics, AgentRunResult, AgentRunStatus
 from tools import sub_agent as sub_agent_module
 from tools.registry import ToolRegistry
 from tools.sub_agent import SubAgentTool
@@ -135,7 +136,7 @@ def test_child_result_is_returned_to_parent_and_parent_continues(
 
     reply = agent.run("use a sub-agent", context=context)
 
-    assert reply == "parent summary"
+    assert reply.output == "parent summary"
     assert len(created) == 1
     # The child's final reply reached the parent conversation as a tool result.
     assert any("child report" in content for content in tool_results(context))
@@ -149,10 +150,16 @@ def test_child_receives_no_parent_context(monkeypatch: pytest.MonkeyPatch) -> No
     class SpyChildAgent:
         last_run_metrics = SimpleNamespace(success=True)
 
-        def run(self, prompt: str, context: Any = None) -> str:
+        def run(self, prompt: str, context: Any = None) -> AgentRunResult:
             captured["prompt"] = prompt
             captured["context"] = context
-            return "child done"
+            return AgentRunResult(
+                output="child done",
+                success=True,
+                error=None,
+                metrics=AgentRunMetrics(),
+                status=AgentRunStatus.SUCCESS,
+            )
 
     registry = ToolRegistry()
     registry.register(SubAgentTool(lambda: SpyChildAgent()))
@@ -187,7 +194,7 @@ def test_child_permanent_llm_failure_is_contained(monkeypatch: pytest.MonkeyPatc
 
     reply = agent.run("delegate", context=context)
 
-    assert reply == "reported failure"
+    assert reply.output == "reported failure"
     assert any("401 invalid api key" in content for content in tool_results(context))
 
 
@@ -217,7 +224,7 @@ def test_child_exception_returns_error_result_to_parent(monkeypatch: pytest.Monk
 
     reply = agent.run("delegate", context=context)
 
-    assert reply == "survived"
+    assert reply.output == "survived"
     assert any("factory exploded" in content for content in tool_results(context))
 
 
@@ -238,7 +245,7 @@ def test_plan_mode_blocks_delegation_at_the_parent(monkeypatch: pytest.MonkeyPat
 
     reply = agent.run("try to delegate", context=context)
 
-    assert reply == "plan only"
+    assert reply.output == "plan only"
     assert created == []  # No child agent was ever constructed.
     assert any("Plan mode is on" in content for content in tool_results(context))
 
@@ -270,7 +277,7 @@ def test_delegation_depth_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
 
     reply = agent.run("nested delegation", context=context)
 
-    assert reply == "top-done"
+    assert reply.output == "top-done"
     # Parent + exactly two nested levels: the fourth level was never spawned.
     assert len(created) == 3
 

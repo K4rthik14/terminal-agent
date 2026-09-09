@@ -1,6 +1,6 @@
 """Unit tests for local multi-agent coordination."""
 
-from context.metrics import AgentRunMetrics
+from context.metrics import AgentRunMetrics, AgentRunResult, AgentRunStatus
 from orchestration.coordinator import MultiAgentCoordinator
 from orchestration.models import AgentRole, DelegatedTask
 
@@ -13,10 +13,16 @@ class FakeAgent:
         # contexts is unreliable because CPython may recycle addresses.
         self.contexts: list[object] = []
 
-    def run(self, prompt: str, context=None) -> str:
+    def run(self, prompt: str, context=None) -> AgentRunResult:
         self.contexts.append(context)
         self.last_run_metrics.finish(True)
-        return f"{self.role.value}: {prompt}"
+        return AgentRunResult(
+            output=f"{self.role.value}: {prompt}",
+            success=True,
+            error=None,
+            metrics=self.last_run_metrics,
+            status=AgentRunStatus.SUCCESS,
+        )
 
 
 def test_coordinator_is_disabled_by_default() -> None:
@@ -71,7 +77,7 @@ def test_coordinator_isolates_context_per_task_and_aggregates_results() -> None:
 
 def test_coordinator_records_task_failure() -> None:
     class FailingAgent(FakeAgent):
-        def run(self, prompt: str, context=None) -> str:
+        def run(self, prompt: str, context=None) -> AgentRunResult:
             raise RuntimeError("agent failed")
 
     result = MultiAgentCoordinator(lambda role: FailingAgent(role), enabled=True).run("Research docs")

@@ -160,7 +160,7 @@ Since the v0.1 hardening pass, the verifier **is** wired into the runtime when c
 
 ## 8c. Sub-agent delegation
 
-The `task` tool (`tools/sub_agent.py`) spawns a child `Agent` through the injected factory: fresh isolated `AgentContext`, its own registry (including approval rules), own loop detector and metrics. The child's final reply returns to the parent as an ordinary tool result; child tool errors are contained inside the child loop, and child LLM failures return `"Error: ..."` text instead of raising into the parent.
+The `task` tool (`tools/sub_agent.py`) spawns a child `Agent` through the injected factory: fresh isolated `AgentContext`, its own registry (including approval rules), own loop detector and metrics. `Agent.run()` returns a structured `AgentRunResult`; the child's successful reply returns to the parent as an ordinary tool result, and a failed child run returns an error `ToolResult` (`is_error=True`) with the child's error text instead of raising into the parent.
 
 Delegation nesting is capped: `SUBAGENT_DEPTH` tracks the executing depth and `MAX_SUBAGENT_DEPTH` (2) refuses further delegation with an error result, so recursive `task()` calls cannot become unbounded.
 

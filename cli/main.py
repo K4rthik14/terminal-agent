@@ -20,6 +20,7 @@ from agent.context import AgentContext
 from cli.renderer import Renderer
 from cli.repl import Repl
 from config.settings import API_KEY_ENV_VARS, MODEL_ENV_VAR, Settings
+from context.metrics import AgentRunStatus
 from llm.base import LLMClient
 from llm.openai_client import OpenAIClient
 from rlm.controller import RLMController, RLMResult
@@ -280,11 +281,17 @@ def main() -> None:
                 RLMController(llm=llm, registry=registry) if settings.rlm_enabled else None
             )
             rlm_result = rlm_controller.run(args.prompt) if rlm_controller is not None else None
-            agent.run(
+            result = agent.run(
                 build_effective_prompt(args.prompt, rlm_result=rlm_result),
                 context=context,
                 rlm_result=rlm_result,
             )
+            if not result.success:
+                # The agent loop already printed LLM errors as they occurred;
+                # render any remaining failure reasons (e.g. budget exhaustion).
+                if result.error and result.status is not AgentRunStatus.LLM_ERROR:
+                    renderer.error(result.error)
+                sys.exit(1)
         else:
             # Interactive REPL
             context = AgentContext(

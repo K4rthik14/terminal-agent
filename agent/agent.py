@@ -17,7 +17,7 @@ from cli.renderer import Renderer
 from config.defaults import LLM_RETRY_BACKOFF_SECONDS, MAX_LLM_RETRIES
 from config.settings import Settings
 from context.loop import LoopDetector
-from context.metrics import AgentRunMetrics
+from context.metrics import AgentRunMetrics, AgentRunResult, AgentRunStatus
 from context.window import MessageWindow
 from llm.base import LLMClient
 from rlm.controller import RLMResult
@@ -71,11 +71,13 @@ class Agent:
         prompt: str,
         context: AgentContext | None = None,
         rlm_result: RLMResult | None = None,
-    ) -> str:
+    ) -> AgentRunResult:
         """
-        Run a single user prompt to completion. Returns the final text reply.
-        If context is None, a fresh context is created (used by sub-agents and single-shot mode).
-        If context is provided, the prompt is appended and the session continues.
+        Run a single user prompt to completion. Returns an AgentRunResult
+        describing the outcome (output text, success flag, error, metrics,
+        terminal status). If context is None, a fresh context is created (used
+        by sub-agents and single-shot mode). If context is provided, the prompt
+        is appended and the session continues.
         """
         if context is None:
             context = AgentContext(
@@ -157,7 +159,13 @@ class Agent:
                     if retry_count >= MAX_LLM_RETRIES or not _is_transient_llm_error(e):
                         print(f"\nLLM error: {e}")
                         metrics.finish(False)
-                        return f"Error: {e}"
+                        return AgentRunResult(
+                            output="",
+                            success=False,
+                            error=f"LLM error: {e}",
+                            metrics=metrics,
+                            status=AgentRunStatus.LLM_ERROR,
+                        )
                     retry_count += 1
                     self._renderer.info(
                         f"Retrying LLM request ({retry_count}/{MAX_LLM_RETRIES})..."
@@ -232,7 +240,13 @@ class Agent:
                 context.add_assistant_message(content=reply)
                 self._renderer.completed()
                 metrics.finish(True)
-                return reply
+                return AgentRunResult(
+                    output=reply,
+                    success=True,
+                    error=None,
+                    metrics=metrics,
+                    status=AgentRunStatus.SUCCESS,
+                )
 
         if (
             not metrics.budget_exceeded
@@ -241,4 +255,16 @@ class Agent:
             metrics.mark_budget_exceeded("max_iterations")
         self._renderer.completed()
         metrics.finish(False)
-        return reply
+        if metrics.budget_exceeded:
+            error = f"Execution budget exceeded: {metrics.budget_exceeded_reason or 'unknown'}"
+            status = AgentRunStatus.BUDGET_EXCEEDED
+        else:
+            error = "Agent run ended without completing the task"
+            status = AgentRunStatus.ERROR
+        return AgentRunResult(
+            output=reply,
+            success=False,
+            error=error,
+            metrics=metrics,
+            status=status,
+        )

@@ -1,9 +1,39 @@
-"""Execution metrics for agent runs."""
+"""Execution metrics and results for agent runs."""
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+class AgentRunStatus(StrEnum):
+    """Terminal statuses the current runtime can genuinely distinguish.
+
+    The runtime can distinguish a completed reply, an LLM failure, and a run
+    stopped by an execution budget. It cannot distinguish tool-error, cancelled,
+    or verification-only outcomes as terminal states, so those are not modeled.
+    """
+
+    SUCCESS = "success"
+    LLM_ERROR = "llm_error"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    ERROR = "error"  # run ended unsuccessfully without a recorded cause
+
+
+@dataclass
+class AgentRunResult:
+    """Structured outcome of one Agent.run() call.
+
+    Callers must never need to parse output text to learn whether a run failed:
+    ``success``/``error``/``status`` carry that information explicitly.
+    """
+
+    output: str
+    success: bool
+    error: str | None
+    metrics: AgentRunMetrics
+    status: AgentRunStatus
 
 
 @dataclass
