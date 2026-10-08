@@ -2,8 +2,10 @@
 
 from types import SimpleNamespace
 
-from cli.main import build_effective_prompt
+from cli.main import build_agent, build_effective_prompt
 from config.settings import Settings
+from rlm.reflection import RLMReflector
+from tools.registry import ToolRegistry
 
 
 class RecordingRLM:
@@ -26,6 +28,17 @@ def test_rlm_enabled_loads_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_RLM_ENABLED", "true")
 
     assert Settings().rlm_enabled is True
+
+
+def test_build_agent_injects_reflector_only_when_enabled() -> None:
+    enabled = Settings(_env_file=None, rlm_enabled=True)
+    disabled = Settings(_env_file=None, rlm_enabled=False)
+
+    enabled_agent = build_agent(enabled, ToolRegistry(), llm=object())  # type: ignore[arg-type]
+    disabled_agent = build_agent(disabled, ToolRegistry(), llm=object())  # type: ignore[arg-type]
+
+    assert isinstance(enabled_agent._rlm_reflector, RLMReflector)
+    assert disabled_agent._rlm_reflector is None
 
 
 def test_rlm_disabled_preserves_prompt_and_does_not_run() -> None:

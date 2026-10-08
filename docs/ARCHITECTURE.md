@@ -166,7 +166,7 @@ Delegation nesting is capped: `SUBAGENT_DEPTH` tracks the executing depth and `M
 
 ## 8d. RLM pre-execution reasoning (experimental)
 
-`rlm.controller.RLMController` is an opt-in bounded reasoning phase for one-shot prompts (`AGENT_RLM_ENABLED=1`, off by default). It exposes only read-only tools via `ReadOnlyRegistry`, allows at most 8 tool-turns to inspect the workspace, and prepends the resulting "execution brief" to the prompt sent to the main agent. If the phase errors or exhausts its iteration budget it degrades safely: the original task runs unchanged. There is currently no measured evidence that the brief improves task success; the feature ships as experimental scaffolding, not a self-improvement system. It applies only to `--prompt` one-shot mode, not interactive sessions.
+`rlm.controller.RLMController` remains an opt-in bounded reasoning phase for one-shot prompts (`AGENT_RLM_ENABLED=1`, off by default). It exposes only read-only tools via `ReadOnlyRegistry`, allows at most 8 tool-turns to inspect the workspace, and prepends the resulting execution brief to the prompt. Separately, `rlm.reflection.RLMReflector` uses the same flag to analyze a failed verification attempt from its bounded tool trajectory and returns three structured fields: what went wrong, likely root cause, and next strategy. The agent appends that strategy to the existing repair feedback before retrying; reflection errors degrade to the existing repair behavior. Reflection is used in interactive and one-shot runs when verification is configured and a retry remains. Quality improvement has not yet been measured, so this remains experimental rather than autonomous learning.
 
 ## 9. Multi-agent coordination
 

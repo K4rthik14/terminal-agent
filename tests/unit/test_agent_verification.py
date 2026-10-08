@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from agent.agent import Agent
 from rlm.controller import RLMResult
+from rlm.reflection import RLMReflection, RLMReflector
 from tools.base import Tool
 from tools.registry import ToolRegistry
 from utils.types import StreamEvent, ToolCall, ToolResult
@@ -27,6 +28,15 @@ class FakeVerifier:
     def verify_test(self, command: str):
         self.commands.append(command)
         return next(self.results)
+
+
+class RecordingReflector:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, list, str]] = []
+
+    def reflect(self, task: str, trajectory: list, failure: str) -> RLMReflection:
+        self.calls.append((task, trajectory, failure))
+        return RLMReflection("failed check", "missed edge case", "inspect assertion")
 
 
 def settings(max_iterations: int = 4):
@@ -104,6 +114,7 @@ def test_verification_failure_is_added_to_context_and_retries() -> None:
     assert len(llm.requests) == 2
     assert any("Verification failed" in str(message.get("content")) for message in llm.requests[1][0])
     assert agent.last_run_metrics.verification_failures == 1
+    assert agent.last_run_metrics.rlm_enabled is False
 
 
 def test_verification_eventually_passes_after_repair() -> None:
@@ -184,6 +195,71 @@ def test_end_to_end_tool_execution_failure_repair_and_pass() -> None:
     assert metrics.verification_passes == 1
     assert metrics.verification_errors == 1
     assert metrics.tool_usage == {"write_file": 1}
+
+
+def test_successful_execution_does_not_trigger_reflection() -> None:
+    llm = FakeLLM([done("complete")])
+    verifier = FakeVerifier([result(True)])
+    reflector = RecordingReflector()
+    agent = Agent(
+        llm,
+        ToolRegistry(),
+        settings(),
+        verifier=verifier,
+        verification_command="pytest -q",
+        rlm_reflector=reflector,  # type: ignore[arg-type]
+    )
+
+    run_result = agent.run("fix it")
+
+    assert run_result.success is True
+    assert reflector.calls == []
+    assert agent.last_run_metrics.rlm_reflections == 0
+
+
+def test_failed_attempt_reflects_on_trajectory_before_retry() -> None:
+    tool = RecordingTool()
+    registry = ToolRegistry()
+    registry.register(tool)
+    llm = FakeLLM(
+        [
+            tool_call_done("write_file", "call_1", '{"path": "test_x.py"}'),
+            done("candidate fix"),
+            [
+                StreamEvent(type="token", content=(
+                    '{"what_went_wrong":"The check failed.",'
+                    '"likely_root_cause":"The edge case is missing.",'
+                    '"next_strategy":"Inspect the failing assertion and handle that edge case."}'
+                )),
+                StreamEvent(type="done", finish_reason="stop"),
+            ],
+            done("repaired"),
+        ]
+    )
+    verifier = FakeVerifier([result(False, error="assertion failed"), result(True)])
+    agent = Agent(
+        llm,
+        registry,
+        settings(),
+        verifier=verifier,
+        verification_command="pytest -q",
+        rlm_reflector=RLMReflector(llm),
+    )
+
+    run_result = agent.run("fix the failing test")
+
+    assert run_result.success is True
+    assert run_result.output == "repaired"
+    assert len(llm.requests) == 4
+    reflection_request = llm.requests[2][0][1]["content"]
+    assert "write_file" in reflection_request
+    retry_messages = llm.requests[3][0]
+    assert any(
+        "handle that edge case" in str(message.get("content"))
+        for message in retry_messages
+    )
+    assert agent.last_run_metrics.rlm_reflections == 1
+    assert agent.last_run_metrics.rlm_reflection_failures == 0
 
 
 def test_rlm_result_is_recorded_in_agent_metrics() -> None:

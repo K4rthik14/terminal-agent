@@ -21,6 +21,7 @@ from context.metrics import AgentRunMetrics, AgentRunResult, AgentRunStatus
 from context.window import MessageWindow
 from llm.base import LLMClient
 from rlm.controller import RLMResult
+from rlm.reflection import RLMReflector, TrajectoryStep
 from tools.registry import ToolRegistry
 from utils.errors import LLMError
 from utils.logging import get_logger
@@ -57,6 +58,7 @@ class Agent:
         renderer: Renderer | None = None,
         verifier: Verifier | None = None,
         verification_command: str = "",
+        rlm_reflector: RLMReflector | None = None,
     ) -> None:
         self._llm = llm
         self._registry = registry
@@ -64,6 +66,7 @@ class Agent:
         self._renderer = renderer or Renderer()
         self._verifier = verifier
         self._verification_command = verification_command
+        self._rlm_reflector = rlm_reflector
         self.last_run_metrics = AgentRunMetrics()
 
     def run(
@@ -92,8 +95,8 @@ class Agent:
         executor = Executor(self._registry, approver, plan_mode=context.plan_mode)
         loop_detector = LoopDetector()
         metrics = AgentRunMetrics()
+        metrics.rlm_enabled = self._rlm_reflector is not None or rlm_result is not None
         if rlm_result is not None:
-            metrics.rlm_enabled = True
             metrics.rlm_iterations = rlm_result.iterations
             metrics.rlm_tool_calls = len(rlm_result.tool_calls)
             metrics.rlm_brief_chars = len(rlm_result.brief)
@@ -101,6 +104,7 @@ class Agent:
         self.last_run_metrics = metrics
         started_at = time.monotonic()
         reply = ""
+        trajectory: list[TrajectoryStep] = []
 
         def budget_reason() -> str | None:
             if (
@@ -212,10 +216,26 @@ class Agent:
                         self._renderer.completed_tool(tc.name, False, started_at)
                         metrics.loop_detection_events += 1
                         context.add_tool_result(tc.id, result_content)
+                        trajectory.append(
+                            TrajectoryStep(
+                                tool_name=tc.name,
+                                arguments=args,
+                                result=result_content,
+                                is_error=True,
+                            )
+                        )
                         continue
                     result = executor.run(tc)
                     self._renderer.completed_tool(tc.name, not result.is_error, started_at)
                     context.add_tool_result(result.tool_call_id, result.content)
+                    trajectory.append(
+                        TrajectoryStep(
+                            tool_name=tc.name,
+                            arguments=args,
+                            result=result.content,
+                            is_error=result.is_error,
+                        )
+                    )
             else:
                 # A configured verifier turns a candidate final reply into a
                 # deterministic check-and-repair turn. No command means the
@@ -227,14 +247,44 @@ class Agent:
                         error=verification.error is not None or verification.timed_out,
                     )
                     if not verification.passed:
-                        detail = verification.error or verification.output or "verification failed"
-                        detail = " ".join(detail.split())[:2000]
-                        context.add_assistant_message(content=reply)
-                        context.add_tool_result(
-                            "verification",
-                            f"Verification failed for the configured check: {detail}. "
-                            "Repair the task and try again.",
+                        detail_parts = [
+                            f"candidate response: {' '.join(reply.split())[:1000]}",
+                            f"check: {verification.check}",
+                            f"command: {verification.command}",
+                        ]
+                        if verification.exit_code is not None:
+                            detail_parts.append(f"exit code: {verification.exit_code}")
+                        if verification.timed_out:
+                            detail_parts.append("timed out: yes")
+                        if verification.error:
+                            detail_parts.append(f"error: {verification.error}")
+                        if verification.output:
+                            detail_parts.append(f"output: {verification.output}")
+                        failure = "\n".join(detail_parts)[:4000]
+                        reflection = None
+                        can_retry = (
+                            len(metrics.context_message_counts) < self._settings.max_iterations
+                            and budget_reason() is None
                         )
+                        if self._rlm_reflector is not None and can_retry:
+                            reflection = self._rlm_reflector.reflect(
+                                task=prompt,
+                                trajectory=trajectory,
+                                failure=failure,
+                            )
+                            if reflection is None:
+                                metrics.rlm_reflection_failures += 1
+                            else:
+                                metrics.rlm_reflections += 1
+                        detail = " ".join(failure.split())[:2000]
+                        feedback = (
+                            f"Verification failed for the configured check: {detail}. "
+                            "Repair the task and try again."
+                        )
+                        if reflection is not None:
+                            feedback += "\n\n" + reflection.as_prompt()
+                        context.add_assistant_message(content=reply)
+                        context.add_tool_result("verification", feedback)
                         continue
                 # Final reply — no more tool calls
                 context.add_assistant_message(content=reply)

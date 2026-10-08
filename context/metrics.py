@@ -59,6 +59,8 @@ class AgentRunMetrics:
     rlm_tool_calls: int = 0
     rlm_brief_chars: int = 0
     rlm_degraded: bool = False
+    rlm_reflections: int = 0
+    rlm_reflection_failures: int = 0
     _started_at: float = field(default_factory=time.monotonic, repr=False)
 
     def finish(self, success: bool) -> None:

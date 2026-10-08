@@ -99,7 +99,7 @@ All settings load from environment variables and/or a local `.env`; CLI flags ov
 | `AGENT_LLM_TIMEOUT_SECONDS` | No | Per-request ceiling in seconds, including streaming (default 120) |
 | `AGENT_VERIFICATION_COMMAND` | No | Shell command run after each candidate final reply; failure triggers a bounded repair iteration (empty = disabled) |
 | `AGENT_VERIFICATION_TIMEOUT_SECONDS` | No | Timeout for the verification command (default 30) |
-| `AGENT_RLM_ENABLED` | No | Opt-in read-only pre-execution reasoning phase for one-shot prompts (default off) |
+| `AGENT_RLM_ENABLED` | No | Opt-in RLM: read-only pre-execution brief for one-shot prompts and failure reflection before a verification-driven retry (default off) |
 
 See `.env.example` for the annotated list.
 
@@ -139,7 +139,7 @@ Shipped and reachable in v0.1.0:
 **Experimental (opt-in):**
 
 - Deterministic verification loop (`AGENT_VERIFICATION_COMMAND`): failed checks trigger a bounded repair iteration
-- RLM-based pre-execution reasoning (`AGENT_RLM_ENABLED`): a bounded read-only inspection phase for one-shot prompts; no measured quality improvement yet
+- RLM (`AGENT_RLM_ENABLED`): a bounded read-only pre-execution brief for one-shot prompts, plus structured failure reflection before verification-driven retries; quality improvement is not yet measured
 
 **Sub-agent delegation:** Reflex can delegate focused tasks to a child agent through the `task` tool.
 

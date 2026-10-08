@@ -24,6 +24,7 @@ from context.metrics import AgentRunStatus
 from llm.base import LLMClient
 from llm.openai_client import OpenAIClient
 from rlm.controller import RLMController, RLMResult
+from rlm.reflection import RLMReflector
 from tools.bash import BashTool
 from tools.file_edit import EditFileTool
 from tools.file_read import ReadFileTool
@@ -104,6 +105,7 @@ def build_agent(
         renderer=renderer,
         verifier=verifier,
         verification_command=verification_command,
+        rlm_reflector=(RLMReflector(llm) if getattr(settings, "rlm_enabled", False) else None),
     )
 
 
