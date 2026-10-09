@@ -13,9 +13,11 @@ import io
 import json
 import os
 import shlex
+import shutil
 import sys
 import tempfile
 import time
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,7 +29,9 @@ from cli.main import build_agent, build_llm, build_registry
 from config.settings import Settings
 from context.metrics import AgentRunMetrics
 from llm.base import LLMClient
-from utils.types import MessageList, StreamEvent
+from tools.base import Tool
+from tools.registry import ToolRegistry
+from utils.types import MessageList, StreamEvent, ToolResult
 from verification.verifier import Verifier
 
 TASKS_PATH = Path(__file__).with_name("rlm_recovery_tasks.json")
@@ -57,6 +61,22 @@ class CountingLLM(LLMClient):
     ) -> Iterator[StreamEvent]:
         self.calls += 1
         yield from self._client.stream(messages, tool_schemas)
+
+
+class CountingTool(Tool):
+    """Count actual tool invocations while returning the wrapped result unchanged."""
+
+    def __init__(self, tool: Tool, counts: Counter[str]) -> None:
+        self._tool = tool
+        self._counts = counts
+        self.name = tool.name
+        self.description = tool.description
+        self.parameters = tool.parameters
+        self.is_read_only = tool.is_read_only
+
+    def run(self, args: dict[str, Any]) -> ToolResult:
+        self._counts[self.name] += 1
+        return self._tool.run(args)
 
 
 class QuietRenderer:
@@ -93,15 +113,61 @@ def load_tasks(path: Path = TASKS_PATH) -> list[RecoveryTask]:
 
 
 def _verification_command() -> str:
-    return f"{shlex.quote(sys.executable)} -B -m pytest -q -p no:cacheprovider test_solution.py"
+    clean_caches = "rm -rf __pycache__ .pytest_cache"
+    pytest = f"{shlex.quote(sys.executable)} -B -m pytest -q -p no:cacheprovider test_solution.py"
+    return f"{clean_caches} && {pytest}"
 
 
-def _write_fixture(task: RecoveryTask, root: Path) -> None:
+def _remove_generated_caches(root: Path) -> None:
+    for path in root.rglob("__pycache__"):
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path, ignore_errors=True)
+    for path in root.rglob(".pytest_cache"):
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def _write_fixture(task: RecoveryTask, root: Path) -> dict[str, int]:
+    protected_mtimes: dict[str, int] = {}
     for relative_name, content in task.files.items():
         target = (root / relative_name).resolve()
         target.relative_to(root.resolve())
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
+        if Path(relative_name).name.startswith("test_"):
+            protected_mtimes[relative_name] = target.stat().st_mtime_ns
+    return protected_mtimes
+
+
+def _workspace_integrity(
+    task: RecoveryTask,
+    root: Path,
+    protected_mtimes: dict[str, int],
+) -> bool:
+    expected_files = set(task.files)
+    expected_directories = {
+        parent.as_posix()
+        for name in expected_files
+        for parent in Path(name).parents
+        if parent.as_posix() != "."
+    }
+    expected_entries = expected_files | expected_directories
+    actual_entries = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+    }
+    if actual_entries != expected_entries:
+        return False
+    for relative_name, original in task.files.items():
+        path = root / relative_name
+        if path.is_symlink() or not path.is_file():
+            return False
+        if Path(relative_name).name.startswith("test_"):
+            if path.read_text(encoding="utf-8") != original:
+                return False
+            if path.stat().st_mtime_ns != protected_mtimes[relative_name]:
+                return False
+    return True
 
 
 def verify_initial_fixtures(tasks: list[RecoveryTask] | None = None) -> dict[str, bool]:
@@ -154,15 +220,35 @@ def _assert_openrouter_configured(settings: Settings) -> None:
         raise RuntimeError("The configured AGENT_BASE_URL is not an OpenRouter endpoint.")
 
 
-def _new_agent(settings: Settings, llm: CountingLLM) -> Agent:
-    def agent_factory() -> Agent:
-        def sub_factory() -> Agent:
-            return build_agent(settings, build_registry(settings, sub_factory), llm=llm)
+def _instrument_registry(
+    registry: ToolRegistry,
+    tool_counts: Counter[str],
+) -> ToolRegistry:
+    instrumented = ToolRegistry()
+    for tool in registry.all():
+        instrumented.register(CountingTool(tool, tool_counts))
+    return instrumented
 
-        registry = build_registry(settings, sub_factory)
-        return build_agent(settings, registry, renderer=QuietRenderer(), llm=llm)  # type: ignore[arg-type]
 
-    return agent_factory()
+def _new_agent(
+    settings: Settings,
+    llm: CountingLLM,
+    tool_counts: Counter[str],
+) -> Agent:
+    def sub_factory() -> Agent:
+        child_registry = _instrument_registry(
+            build_registry(settings, sub_factory),
+            tool_counts,
+        )
+        return build_agent(settings, child_registry, llm=llm)
+
+    registry = _instrument_registry(build_registry(settings, sub_factory), tool_counts)
+    return build_agent(
+        settings,
+        registry,
+        renderer=QuietRenderer(),  # type: ignore[arg-type]
+        llm=llm,
+    )
 
 
 def _run_task(task: RecoveryTask, enabled: bool) -> dict[str, Any]:
@@ -171,28 +257,42 @@ def _run_task(task: RecoveryTask, enabled: bool) -> dict[str, Any]:
         _assert_openrouter_configured(settings)
         with tempfile.TemporaryDirectory(prefix=f"rlm-live-{task.id}-") as directory:
             workspace = Path(directory)
-            _write_fixture(task, workspace)
+            protected_mtimes = _write_fixture(task, workspace)
             previous_cwd = Path.cwd()
             try:
                 os.chdir(workspace)
                 llm = CountingLLM(build_llm(settings))
-                agent = _new_agent(settings, llm)
+                tool_counts: Counter[str] = Counter()
+                agent = _new_agent(settings, llm, tool_counts)
                 started = time.monotonic()
                 with contextlib.redirect_stdout(io.StringIO()):
                     result = agent.run(task.prompt)
                 elapsed = time.monotonic() - started
                 metrics: AgentRunMetrics = result.metrics
+                _remove_generated_caches(workspace)
+                integrity_passed = _workspace_integrity(task, workspace, protected_mtimes)
+                verified_success = result.success and metrics.verification_passes > 0
                 return {
                     "id": task.id,
                     "failure_type": task.failure_type,
-                    "success": result.success and metrics.verification_passes > 0,
+                    "success": verified_success and integrity_passed,
                     "recovered_after_failure": (
-                        metrics.verification_failures > 0 and metrics.verification_passes > 0
+                        metrics.verification_failures > 0
+                        and metrics.verification_passes > 0
+                        and integrity_passed
                     ),
+                    "fixture_integrity_passed": integrity_passed,
+                    "agent_status": result.status.value,
+                    "budget_exceeded_reason": metrics.budget_exceeded_reason,
+                    "verification_passes": metrics.verification_passes,
+                    "verification_errors": metrics.verification_errors,
+                    "tool_usage": dict(tool_counts),
+                    "tool_calls": sum(tool_counts.values()),
+                    "agent_reported_tool_calls": metrics.tool_calls,
+                    "agent_reported_tool_usage": dict(metrics.tool_usage),
                     "repair_attempts": max(0, metrics.verification_attempts - 1),
                     "verification_attempts": metrics.verification_attempts,
                     "verification_failures": metrics.verification_failures,
-                    "tool_calls": metrics.tool_calls,
                     "reflection_calls": metrics.rlm_reflections,
                     "reflection_failures": metrics.rlm_reflection_failures,
                     "llm_requests": llm.calls,
@@ -205,13 +305,20 @@ def _run_task(task: RecoveryTask, enabled: bool) -> dict[str, Any]:
 def _summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(results)
     recoveries = sum(1 for item in results if item["recovered_after_failure"])
+    failed_attempts = sum(1 for item in results if item["verification_failures"] > 0)
     return {
         "tasks": total,
         "successes": sum(1 for item in results if item["success"]),
         "success_rate": sum(1 for item in results if item["success"]) / total if total else 0,
+        "tasks_with_verification_failure": failed_attempts,
         "successful_recoveries": recoveries,
-        "successful_recovery_rate": recoveries / total if total else 0,
+        "successful_recovery_rate": recoveries / failed_attempts if failed_attempts else 0,
         "verification_failures": sum(int(item["verification_failures"]) for item in results),
+        "verification_passes": sum(int(item["verification_passes"]) for item in results),
+        "verification_errors": sum(int(item["verification_errors"]) for item in results),
+        "fixture_integrity_failures": sum(
+            1 for item in results if not item["fixture_integrity_passed"]
+        ),
         "repair_attempts": sum(int(item["repair_attempts"]) for item in results),
         "tool_calls": sum(int(item["tool_calls"]) for item in results),
         "reflection_calls": sum(int(item["reflection_calls"]) for item in results),
