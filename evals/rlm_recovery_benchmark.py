@@ -1,113 +1,66 @@
-"""Deterministic fault-injection benchmark for trajectory-based repair reflection.
+"""Paired, live-OpenRouter benchmark for trajectory-based recovery reflection.
 
-Run with ``python -m evals.rlm_recovery_benchmark``. This uses a scripted LLM,
-not a provider model: it measures the real Agent/verifier/reflection wiring and
-illustrates controlled outcomes, not live-model quality.
+Run with ``python -m evals.rlm_recovery_benchmark --allow-api-costs`` after
+configuring an OpenRouter key. This runs the production OpenAI-compatible client
+and Agent; it intentionally has no fake or scripted LLM fallback.
 """
 
 from __future__ import annotations
 
+import argparse
+import contextlib
+import io
 import json
 import os
+import shlex
+import sys
 import tempfile
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from agent.agent import Agent
+from cli.main import build_agent, build_llm, build_registry
 from config.settings import Settings
 from context.metrics import AgentRunMetrics
-from rlm.reflection import RLMReflector
-from tools.file_write import WriteFileTool
-from tools.registry import ToolRegistry
-from utils.types import StreamEvent
+from llm.base import LLMClient
+from utils.types import MessageList, StreamEvent
 from verification.verifier import Verifier
+
+TASKS_PATH = Path(__file__).with_name("rlm_recovery_tasks.json")
 
 
 @dataclass(frozen=True)
 class RecoveryTask:
+    """A buggy starting workspace, coding prompt, and executable test contract."""
+
     id: str
+    failure_type: str
     prompt: str
-    tests: str
-    initial_code: str
-    baseline_repair: str
-    reflection_repair: str
-    reflection_strategy: str
+    files: dict[str, str]
 
 
-TASKS = (
-    RecoveryTask(
-        id="strip-before-lowercase",
-        prompt=(
-            "Implement normalize_name(value) in solution.py: trim surrounding whitespace "
-            "and lowercase the result."
-        ),
-        tests=(
-            "from solution import normalize_name\n"
-            "def test_trims_and_lowercases():\n"
-            "    assert normalize_name('  Ada LOVELACE  ') == 'ada lovelace'\n"
-        ),
-        initial_code="def normalize_name(value):\n    return value.lower()\n",
-        baseline_repair="def normalize_name(value):\n    return value.lower()\n",
-        reflection_repair="def normalize_name(value):\n    return value.strip().lower()\n",
-        reflection_strategy=(
-            "Strip surrounding whitespace before lowercasing; the assertion includes padded input."
-        ),
-    ),
-    RecoveryTask(
-        id="even-negative-integers",
-        prompt="Implement is_even(value) in solution.py for positive and negative integers.",
-        tests=(
-            "from solution import is_even\n"
-            "def test_positive_and_negative_even_values():\n"
-            "    assert is_even(4) is True\n"
-            "    assert is_even(-3) is False\n"
-        ),
-        initial_code="def is_even(value):\n    return value % 2 == 1\n",
-        baseline_repair="def is_even(value):\n    return value % 2 == 0\n",
-        reflection_repair="def is_even(value):\n    return value % 2 == 0\n",
-        reflection_strategy=(
-            "Use remainder zero to identify even integers, including negative values."
-        ),
-    ),
-    RecoveryTask(
-        id="zero-divisor-contract",
-        prompt=(
-            "Implement safe_divide(a, b) in solution.py: return None when b is zero, "
-            "otherwise return a / b."
-        ),
-        tests=(
-            "from solution import safe_divide\n"
-            "def test_division_contract():\n"
-            "    assert safe_divide(8, 2) == 4\n"
-            "    assert safe_divide(8, 0) is None\n"
-        ),
-        initial_code=(
-            "def safe_divide(a, b):\n"
-            "    if b == 0:\n"
-            "        return 0\n"
-            "    return a / b\n"
-        ),
-        baseline_repair=(
-            "def safe_divide(a, b):\n"
-            "    if b == 0:\n"
-            "        return None\n"
-            "    return a / b\n"
-        ),
-        reflection_repair=(
-            "def safe_divide(a, b):\n"
-            "    if b == 0:\n"
-            "        return 0\n"
-            "    return a / b\n"
-        ),
-        reflection_strategy="Keep a numeric fallback of 0 for division by zero.",
-    ),
-)
+class CountingLLM(LLMClient):
+    """Count requests while delegating every response to the configured provider."""
+
+    def __init__(self, client: LLMClient) -> None:
+        self._client = client
+        self.calls = 0
+
+    def stream(
+        self,
+        messages: MessageList,
+        tool_schemas: list[dict[str, Any]],
+    ) -> Iterator[StreamEvent]:
+        self.calls += 1
+        yield from self._client.stream(messages, tool_schemas)
 
 
 class QuietRenderer:
-    """Suppress interactive rendering while leaving the Agent run path intact."""
+    """Provide the Agent renderer interface without interactive terminal output."""
 
     def thinking(self) -> None:
         pass
@@ -125,200 +78,224 @@ class QuietRenderer:
         pass
 
 
-def _text_events(text: str) -> list[StreamEvent]:
-    return [StreamEvent(type="token", content=text), StreamEvent(type="done", finish_reason="stop")]
-
-
-class ScenarioLLM:
-    """Script a first attempt and a repair, using reflection only as a branch signal."""
-
-    def __init__(self, task: RecoveryTask) -> None:
-        self.task = task
-        self.main_turn = 0
-        self.llm_calls = 0
-        self.reflection_calls = 0
-        self.estimated_prompt_tokens = 0
-        self.estimated_completion_tokens = 0
-
-    def stream(self, messages: list[dict[str, Any]], tool_schemas: list[dict[str, Any]]):
-        self.llm_calls += 1
-        prompt_size = len(json.dumps(messages, ensure_ascii=False))
-        self.estimated_prompt_tokens += (prompt_size + 3) // 4
-        is_reflection = bool(
-            messages
-            and "Analyze the failed coding-agent attempt" in str(messages[0].get("content", ""))
+def load_tasks(path: Path = TASKS_PATH) -> list[RecoveryTask]:
+    """Load the checked-in task fixtures in stable order."""
+    raw_tasks = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        RecoveryTask(
+            id=str(item["id"]),
+            failure_type=str(item["failure_type"]),
+            prompt=str(item["prompt"]),
+            files={str(name): str(content) for name, content in item["files"].items()},
         )
-        if is_reflection:
-            self.reflection_calls += 1
-            response = json.dumps(
-                {
-                    "what_went_wrong": (
-                        "The first implementation did not satisfy the failing assertion."
+        for item in raw_tasks
+    ]
+
+
+def _verification_command() -> str:
+    return f"{shlex.quote(sys.executable)} -B -m pytest -q -p no:cacheprovider test_solution.py"
+
+
+def _write_fixture(task: RecoveryTask, root: Path) -> None:
+    for relative_name, content in task.files.items():
+        target = (root / relative_name).resolve()
+        target.relative_to(root.resolve())
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
+
+def verify_initial_fixtures(tasks: list[RecoveryTask] | None = None) -> dict[str, bool]:
+    """Confirm every fresh starter workspace fails its own test before an agent run."""
+    fixture_tasks = tasks if tasks is not None else load_tasks()
+    results: dict[str, bool] = {}
+    for task in fixture_tasks:
+        with tempfile.TemporaryDirectory(prefix=f"rlm-fixture-{task.id}-") as directory:
+            workspace = Path(directory)
+            _write_fixture(task, workspace)
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(workspace)
+                results[task.id] = not Verifier(timeout_seconds=30).verify_test(
+                    _verification_command()
+                ).passed
+            finally:
+                os.chdir(previous_cwd)
+    return results
+
+
+@contextlib.contextmanager
+def _configured_environment(enabled: bool) -> Iterator[None]:
+    values = {
+        "AGENT_RLM_ENABLED": "true" if enabled else "false",
+        "AGENT_VERIFICATION_COMMAND": _verification_command(),
+        "AGENT_VERIFICATION_TIMEOUT_SECONDS": "30",
+        "AGENT_APPROVAL_MODE": "never",
+        "AGENT_MAX_ITERATIONS": "12",
+        "AGENT_MAX_TOOL_CALLS": "60",
+        "AGENT_MAX_EXECUTION_TIME_SECONDS": "240",
+    }
+    previous = {name: os.environ.get(name) for name in values}
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def _assert_openrouter_configured(settings: Settings) -> None:
+    if not settings.api_key:
+        raise RuntimeError("No API key configured; set AGENT_API_KEY or OPENROUTER_API_KEY.")
+    hostname = (urlparse(settings.base_url).hostname or "").lower()
+    if hostname != "openrouter.ai" and not hostname.endswith(".openrouter.ai"):
+        raise RuntimeError("The configured AGENT_BASE_URL is not an OpenRouter endpoint.")
+
+
+def _new_agent(settings: Settings, llm: CountingLLM) -> Agent:
+    def agent_factory() -> Agent:
+        def sub_factory() -> Agent:
+            return build_agent(settings, build_registry(settings, sub_factory), llm=llm)
+
+        registry = build_registry(settings, sub_factory)
+        return build_agent(settings, registry, renderer=QuietRenderer(), llm=llm)  # type: ignore[arg-type]
+
+    return agent_factory()
+
+
+def _run_task(task: RecoveryTask, enabled: bool) -> dict[str, Any]:
+    with _configured_environment(enabled):
+        settings = Settings()
+        _assert_openrouter_configured(settings)
+        with tempfile.TemporaryDirectory(prefix=f"rlm-live-{task.id}-") as directory:
+            workspace = Path(directory)
+            _write_fixture(task, workspace)
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(workspace)
+                llm = CountingLLM(build_llm(settings))
+                agent = _new_agent(settings, llm)
+                started = time.monotonic()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    result = agent.run(task.prompt)
+                elapsed = time.monotonic() - started
+                metrics: AgentRunMetrics = result.metrics
+                return {
+                    "id": task.id,
+                    "failure_type": task.failure_type,
+                    "success": result.success and metrics.verification_passes > 0,
+                    "recovered_after_failure": (
+                        metrics.verification_failures > 0 and metrics.verification_passes > 0
                     ),
-                    "likely_root_cause": (
-                        "The implementation overlooked the specific input contract."
-                    ),
-                    "next_strategy": self.task.reflection_strategy,
+                    "repair_attempts": max(0, metrics.verification_attempts - 1),
+                    "verification_attempts": metrics.verification_attempts,
+                    "verification_failures": metrics.verification_failures,
+                    "tool_calls": metrics.tool_calls,
+                    "reflection_calls": metrics.rlm_reflections,
+                    "reflection_failures": metrics.rlm_reflection_failures,
+                    "llm_requests": llm.calls,
+                    "execution_seconds": round(elapsed, 3),
                 }
-            )
-            self.estimated_completion_tokens += (len(response) + 3) // 4
-            return iter(_text_events(response))
-
-        if self.main_turn in (0, 2):
-            repair = self.main_turn == 2
-            code = (
-                self.task.reflection_repair
-                if repair and _reflection_is_in_context(messages)
-                else self.task.baseline_repair
-                if repair
-                else self.task.initial_code
-            )
-            args = json.dumps({"path": "solution.py", "content": code})
-            call_index = self.main_turn // 2
-            events = [
-                StreamEvent(
-                    type="tool_call_delta",
-                    tool_call_index=0,
-                    tool_call_id=f"write-{call_index}",
-                    tool_call_name="write_file",
-                    content=args,
-                ),
-                StreamEvent(type="done", finish_reason="tool_calls"),
-            ]
-            self.estimated_completion_tokens += (len(args) + 3) // 4
-        elif self.main_turn in (1, 3):
-            response = "The requested implementation is in solution.py."
-            events = _text_events(response)
-            self.estimated_completion_tokens += (len(response) + 3) // 4
-        else:
-            raise RuntimeError(f"Unexpected scripted main-model turn {self.main_turn}")
-        self.main_turn += 1
-        return iter(events)
-
-
-def _reflection_is_in_context(messages: list[dict[str, Any]]) -> bool:
-    return any(
-        "Reflection on the previous attempt:" in str(message.get("content", ""))
-        for message in messages
-    )
-
-
-def _run_task(task: RecoveryTask, rlm_enabled: bool) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix=f"rlm-eval-{task.id}-") as workspace:
-        root = Path(workspace)
-        (root / "test_solution.py").write_text(task.tests, encoding="utf-8")
-        previous_cwd = Path.cwd()
-        os.chdir(root)
-        try:
-            llm = ScenarioLLM(task)
-            os.environ["AGENT_RLM_ENABLED"] = "true" if rlm_enabled else "false"
-            settings = Settings(
-                approval_mode="never",
-                max_iterations=4,
-                max_context_messages=24,
-                max_tool_calls=20,
-                max_execution_time_seconds=30,
-            )
-            registry = ToolRegistry()
-            registry.register(WriteFileTool())
-            agent = Agent(
-                llm=llm,
-                registry=registry,
-                settings=settings,
-                renderer=QuietRenderer(),  # type: ignore[arg-type]
-                verifier=Verifier(timeout_seconds=10),
-                verification_command=(
-                    f"rm -rf __pycache__ && {os.sys.executable} -m pytest -q test_solution.py"
-                ),
-                rlm_reflector=RLMReflector(llm) if settings.rlm_enabled else None,
-            )
-            started = time.monotonic()
-            result = agent.run(task.prompt)
-            wall_seconds = time.monotonic() - started
-            run_metrics: AgentRunMetrics = result.metrics
-            return {
-                "id": task.id,
-                "success": result.success and run_metrics.verification_passes > 0,
-                "recovered_after_failure": (
-                    run_metrics.verification_failures > 0 and run_metrics.verification_passes > 0
-                ),
-                "verification_attempts": run_metrics.verification_attempts,
-                "verification_failures": run_metrics.verification_failures,
-                "repair_attempts": max(0, run_metrics.verification_attempts - 1),
-                "tool_calls": run_metrics.tool_calls,
-                "execution_seconds": round(wall_seconds, 6),
-                "reflection_calls": run_metrics.rlm_reflections,
-                "reflection_failures": run_metrics.rlm_reflection_failures,
-                "llm_calls_including_reflection": llm.llm_calls,
-                "estimated_prompt_tokens": llm.estimated_prompt_tokens,
-                "estimated_completion_tokens": llm.estimated_completion_tokens,
-                "estimated_total_tokens": (
-                    llm.estimated_prompt_tokens + llm.estimated_completion_tokens
-                ),
-            }
-        finally:
-            os.chdir(previous_cwd)
+            finally:
+                os.chdir(previous_cwd)
 
 
 def _summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(results)
-    sum_fields = (
-        "verification_failures",
-        "repair_attempts",
-        "tool_calls",
-        "reflection_calls",
-        "reflection_failures",
-        "llm_calls_including_reflection",
-        "estimated_prompt_tokens",
-        "estimated_completion_tokens",
-        "estimated_total_tokens",
-    )
+    recoveries = sum(1 for item in results if item["recovered_after_failure"])
     return {
         "tasks": total,
         "successes": sum(1 for item in results if item["success"]),
         "success_rate": sum(1 for item in results if item["success"]) / total if total else 0,
-        "successful_recoveries": sum(1 for item in results if item["recovered_after_failure"]),
-        **{field: sum(int(item[field]) for item in results) for field in sum_fields},
+        "successful_recoveries": recoveries,
+        "successful_recovery_rate": recoveries / total if total else 0,
+        "verification_failures": sum(int(item["verification_failures"]) for item in results),
+        "repair_attempts": sum(int(item["repair_attempts"]) for item in results),
+        "tool_calls": sum(int(item["tool_calls"]) for item in results),
+        "reflection_calls": sum(int(item["reflection_calls"]) for item in results),
+        "reflection_failures": sum(int(item["reflection_failures"]) for item in results),
+        "llm_requests": sum(int(item["llm_requests"]) for item in results),
         "mean_execution_seconds": round(
             sum(float(item["execution_seconds"]) for item in results) / total if total else 0,
-            6,
+            3,
+        ),
+        "provider_token_usage": None,
+        "provider_token_usage_note": (
+            "Not exposed by the current streaming client; no synthetic token estimate substituted."
         ),
     }
 
 
-def run_benchmark() -> dict[str, Any]:
-    """Run identical tasks with the public RLM environment flag both off and on."""
-    old_value = os.environ.get("AGENT_RLM_ENABLED")
-    modes: dict[str, Any] = {}
-    try:
-        for enabled in (False, True):
-            mode_name = f"AGENT_RLM_ENABLED={'true' if enabled else 'false'}"
-            results = [_run_task(task, enabled) for task in TASKS]
-            modes[mode_name] = {"summary": _summarize(results), "results": results}
-    finally:
-        if old_value is None:
-            os.environ.pop("AGENT_RLM_ENABLED", None)
+def _compare_modes(off: list[dict[str, Any]], on: list[dict[str, Any]]) -> dict[str, list[str]]:
+    on_by_id = {str(item["id"]): item for item in on}
+    categories: dict[str, list[str]] = {
+        "helped": [],
+        "no_outcome_change": [],
+        "harmed": [],
+    }
+    for baseline in off:
+        task_id = str(baseline["id"])
+        baseline_passed = bool(baseline["success"])
+        rlm_passed = bool(on_by_id[task_id]["success"])
+        if rlm_passed and not baseline_passed:
+            categories["helped"].append(task_id)
+        elif baseline_passed and not rlm_passed:
+            categories["harmed"].append(task_id)
         else:
-            os.environ["AGENT_RLM_ENABLED"] = old_value
+            categories["no_outcome_change"].append(task_id)
+    return categories
+
+
+def run_benchmark(allow_api_costs: bool = False) -> dict[str, Any]:
+    """Run paired live tasks; refuse provider calls unless the caller opts in."""
+    if not allow_api_costs:
+        raise RuntimeError(
+            "This live benchmark can incur OpenRouter charges. Re-run with --allow-api-costs "
+            "only if those requests are approved."
+        )
+    tasks = load_tasks()
+    with _configured_environment(False):
+        configured_settings = Settings()
+        _assert_openrouter_configured(configured_settings)
+        model = configured_settings.model
+    initial = verify_initial_fixtures(tasks)
+    failed_fixtures = [task_id for task_id, failed in initial.items() if not failed]
+    if failed_fixtures:
+        raise RuntimeError(f"Starter fixtures must fail before the agent runs: {failed_fixtures}")
+
+    modes: dict[str, Any] = {}
+    for enabled in (False, True):
+        name = f"AGENT_RLM_ENABLED={'true' if enabled else 'false'}"
+        results = [_run_task(task, enabled) for task in tasks]
+        modes[name] = {"summary": _summarize(results), "results": results}
     return {
-        "benchmark": "trajectory-reflection-recovery-fault-injection-v1",
-        "model": "deterministic scripted fake; no provider calls",
-        "scope": (
-            "Agent verification-and-repair loop with optional RLMReflector; "
-            "excludes pre-execution brief"
+        "benchmark": "openrouter-trajectory-recovery-v1",
+        "provider": "OpenRouter",
+        "model": model,
+        "task_ids": [task.id for task in tasks],
+        "initial_fixtures_fail": initial,
+        "outcome_comparison": _compare_modes(
+            modes["AGENT_RLM_ENABLED=false"]["results"],
+            modes["AGENT_RLM_ENABLED=true"]["results"],
         ),
-        "token_accounting": (
-            "approximate character/4 estimate from synthetic messages; "
-            "not provider token usage"
-        ),
-        "tasks": [task.id for task in TASKS],
         "modes": modes,
     }
 
 
-def main() -> int:
-    report = run_benchmark()
-    print(json.dumps(report, indent=2))
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-api-costs",
+        action="store_true",
+        help="Acknowledge that 24 task runs plus repair/reflection requests may incur charges.",
+    )
+    args = parser.parse_args(argv)
+    try:
+        print(json.dumps(run_benchmark(allow_api_costs=args.allow_api_costs), indent=2))
+    except RuntimeError as exc:
+        parser.error(str(exc))
     return 0
 
 

@@ -1,0 +1,110 @@
+[
+  {
+    "id": "trim-name-whitespace",
+    "failure_type": "input-normalization",
+    "prompt": "Fix normalize_name(value) in solution.py. Strip surrounding whitespace, then lowercase the name.",
+    "files": {
+      "solution.py": "def normalize_name(value):\n    return value.lower()\n",
+      "test_solution.py": "from solution import normalize_name\ndef test_contract():\n    assert normalize_name('  Ada  ') == 'ada'\n"
+    }
+  },
+  {
+    "id": "empty-sequence-first-item",
+    "failure_type": "empty-input",
+    "prompt": "Fix first_item(items) in solution.py. Return None for an empty sequence; otherwise return the first item.",
+    "files": {
+      "solution.py": "def first_item(items):\n    return items[0]\n",
+      "test_solution.py": "from solution import first_item\ndef test_contract():\n    assert first_item([]) is None\n    assert first_item([7]) == 7\n"
+    }
+  },
+  {
+    "id": "prefix-count-boundary",
+    "failure_type": "off-by-one",
+    "prompt": "Fix take_prefix(items, count) in solution.py to return exactly the first count items.",
+    "files": {
+      "solution.py": "def take_prefix(items, count):\n    return items[:count - 1]\n",
+      "test_solution.py": "from solution import take_prefix\ndef test_contract():\n    assert take_prefix([1, 2, 3, 4], 3) == [1, 2, 3]\n"
+    }
+  },
+  {
+    "id": "boolean-string-case-and-space",
+    "failure_type": "case-and-whitespace",
+    "prompt": "Fix parse_bool(value) in solution.py so case and surrounding whitespace do not matter. Only the string true should parse as true.",
+    "files": {
+      "solution.py": "def parse_bool(value):\n    return value == 'true'\n",
+      "test_solution.py": "from solution import parse_bool\ndef test_contract():\n    assert parse_bool(' TRUE ') is True\n    assert parse_bool(' false ') is False\n"
+    }
+  },
+  {
+    "id": "even-remainder",
+    "failure_type": "boolean-condition",
+    "prompt": "Fix is_even(value) in solution.py for positive and negative integers.",
+    "files": {
+      "solution.py": "def is_even(value):\n    return value % 2 == 1\n",
+      "test_solution.py": "from solution import is_even\ndef test_contract():\n    assert is_even(4) is True\n    assert is_even(-3) is False\n"
+    }
+  },
+  {
+    "id": "factorial-inclusive-bound",
+    "failure_type": "off-by-one",
+    "prompt": "Fix factorial(value) in solution.py. factorial(0) must be 1, and factorial(5) must be 120.",
+    "files": {
+      "solution.py": "def factorial(value):\n    result = 1\n    for number in range(1, value):\n        result *= number\n    return result\n",
+      "test_solution.py": "from solution import factorial\ndef test_contract():\n    assert factorial(5) == 120\n    assert factorial(0) == 1\n"
+    }
+  },
+  {
+    "id": "zero-divisor-sentinel",
+    "failure_type": "return-contract",
+    "prompt": "Fix safe_divide(a, b) in solution.py: return None when b is zero, otherwise return a / b.",
+    "files": {
+      "solution.py": "def safe_divide(a, b):\n    if b == 0:\n        return 0\n    return a / b\n",
+      "test_solution.py": "from solution import safe_divide\ndef test_contract():\n    assert safe_divide(8, 2) == 4\n    assert safe_divide(8, 0) is None\n"
+    }
+  },
+  {
+    "id": "stable-unique-order",
+    "failure_type": "collection-order",
+    "prompt": "Fix stable_unique(values) in solution.py. Remove duplicates while preserving the first-seen order.",
+    "files": {
+      "solution.py": "def stable_unique(values):\n    return list(set(values))\n",
+      "test_solution.py": "from solution import stable_unique\ndef test_contract():\n    assert stable_unique([3, 1, 3, 2]) == [3, 1, 2]\n"
+    }
+  },
+  {
+    "id": "exact-file-suffix",
+    "failure_type": "string-boundary",
+    "prompt": "Fix remove_txt_suffix(name) in solution.py. Remove one exact trailing .txt suffix, leaving other characters unchanged.",
+    "files": {
+      "solution.py": "def remove_txt_suffix(name):\n    return name.strip('.txt')\n",
+      "test_solution.py": "from solution import remove_txt_suffix\ndef test_contract():\n    assert remove_txt_suffix('report.txt') == 'report'\n    assert remove_txt_suffix('text.txt') == 'text'\n"
+    }
+  },
+  {
+    "id": "fractional-mean",
+    "failure_type": "numeric-precision",
+    "prompt": "Fix mean(values) in solution.py and preserve fractional results.",
+    "files": {
+      "solution.py": "def mean(values):\n    return sum(values) // len(values)\n",
+      "test_solution.py": "from solution import mean\ndef test_contract():\n    assert mean([2, 3]) == 2.5\n"
+    }
+  },
+  {
+    "id": "case-insensitive-vowel-count",
+    "failure_type": "case-sensitivity",
+    "prompt": "Fix count_vowels(text) in solution.py so uppercase vowels are counted too.",
+    "files": {
+      "solution.py": "def count_vowels(text):\n    return sum(1 for char in text if char in 'aeiou')\n",
+      "test_solution.py": "from solution import count_vowels\ndef test_contract():\n    assert count_vowels('AbE') == 2\n"
+    }
+  },
+  {
+    "id": "inclusive-range-boundaries",
+    "failure_type": "boundary-condition",
+    "prompt": "Fix in_range(value, low, high) in solution.py; both boundary values are inside the range.",
+    "files": {
+      "solution.py": "def in_range(value, low, high):\n    return low < value < high\n",
+      "test_solution.py": "from solution import in_range\ndef test_contract():\n    assert in_range(2, 2, 5) is True\n    assert in_range(5, 2, 5) is True\n"
+    }
+  }
+]

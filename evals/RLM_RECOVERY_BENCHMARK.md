@@ -1,39 +1,29 @@
-# Trajectory-reflection recovery benchmark
+# Live OpenRouter trajectory-reflection benchmark
 
-**Run:** `python -m evals.rlm_recovery_benchmark`
-**Benchmark:** `trajectory-reflection-recovery-fault-injection-v1`
-**Model:** deterministic scripted fake; no provider/API calls.
-**Scope:** the real `Agent` loop, write tool, `pytest` verifier, and optional `RLMReflector`. The CLI pre-execution brief is intentionally excluded so this isolates failure reflection.
+## Status
 
-## Results
+The benchmark now runs the production OpenRouter-compatible client through the real `Agent`, tool registry, verification loop, and `RLMReflector`. The LLM is not scripted. It uses 12 paired coding tasks in [`rlm_recovery_tasks.json`](rlm_recovery_tasks.json), each with a deliberately faulty starter workspace and a `pytest` acceptance test.
 
-| Metric (3 tasks) | `AGENT_RLM_ENABLED=false` | `AGENT_RLM_ENABLED=true` |
-| --- | ---: | ---: |
-| Successful tasks / rate | 2 / 3 (66.7%) | 2 / 3 (66.7%) |
-| Verification failures | 4 | 4 |
-| Recovered after at least one failure | 2 | 2 |
-| Repair attempts | 3 | 3 |
-| Tool calls | 6 | 6 |
-| Mean wall time per task | 0.689 s | 0.722 s |
-| Reflection failures | 0 | 0 |
-| Reflection calls | 0 | 3 |
-| LLM calls, including reflection | 12 | 15 |
-| Estimated synthetic tokens | 5,301 | 7,236 |
+**Live benchmark results are not available yet.** The environment has no `AGENT_API_KEY`/`OPENROUTER_API_KEY` and no project `.env`, so no OpenRouter requests were made. All 12 starter workspaces were locally verified to fail their acceptance test before an agent run. This confirms the fixtures are recoverable test inputs, not that either agent mode repairs them.
 
-Execution time is the elapsed local run time, dominated by starting `pytest`; these small differences are not a reliable latency comparison. Token figures are only character-count / 4 estimates over synthetic prompts and completions, **not provider token usage**.
+## Run
 
-## Representative cases
+After configuring an OpenRouter key and deciding to permit provider charges, run:
 
-| Task | RLM off | RLM on | Observation |
-| --- | --- | --- | --- |
-| `strip-before-lowercase` | Failed after repair | Recovered | The configured reflection strategy selected the correct `strip()` fix. |
-| `even-negative-integers` | Recovered | Recovered | No outcome change; both repair paths used the same correct modulo check. |
-| `zero-divisor-contract` | Recovered | Failed after repair | The scripted reflection strategy recommended `0`, contradicting the test's `None` contract; following it regressed the repair. |
+```bash
+python -m evals.rlm_recovery_benchmark --allow-api-costs
+```
 
-## Interpretation and limits
+The explicit flag is required because a full paired run makes 24 task runs plus any repair/reflection requests. The runner refuses to make provider calls without it and checks that the configured endpoint is OpenRouter. Each task/mode pair starts from identical files in a fresh temporary workspace. Python bytecode writing and pytest's cache provider are disabled, and verification is run after each candidate reply.
 
-On this *constructed* set the overall success rate and recovery count are tied: reflection changes which tasks pass rather than increasing aggregate success. It helps once, makes one repair worse, and has no effect once. It also adds three LLM calls and about 36.5% more estimated synthetic tokens here. There were no reflection parse/runtime failures.
+## Tasks and outcomes
 
-This is a reproducible fault-injection/control-flow check, **not evidence that trajectory-based reflection improves a real model's coding ability**. The scripted client deliberately selects task-specific repair outcomes based on whether the real reflection text is present; therefore the helpful and harmful cases are examples of what good/bad advice can do, not independent model judgments. No API key was configured for this run, so a live-model paired experiment could not be performed. A live evaluation should repeat paired tasks across multiple seeds/runs and capture provider-reported usage.
+The task set covers input normalization, empty input, off-by-one errors, case/whitespace handling, boolean conditions, numeric return contracts, collection ordering, string suffix boundaries, precision, and inclusive boundaries. The tests define the acceptance criteria; the starting implementations and prompts are checked in with the task data.
 
-No RLM architecture changes were indicated by this harness run. The benchmark clears workspace bytecode before each verification to prevent Python's timestamp/size-based `.pyc` cache from making a just-written repair appear not to have taken effect.
+The report classifies a task as **helped** if RLM passes while baseline fails, **harmed** if baseline passes while RLM fails, and **no outcome change** otherwise. This classification is calculated from verifier outcomes, not assigned in advance.
+
+## Metrics and limitations
+
+The JSON output records per-task pass/recovery outcomes, verification failures, repair attempts, tool calls, reflection calls/failures, counted LLM requests, and elapsed execution time, plus aggregates for success and recovery rates. Provider token usage is reported as unavailable: the current streaming client does not expose provider usage, and this benchmark does not substitute synthetic token estimates.
+
+Live-model results will be stochastic and depend on the configured model, prompt behavior, and OpenRouter availability. A single paired run is a small exploratory evaluation, not evidence of general coding quality. Compare repeated runs and record the exact model/configuration before drawing conclusions. The earlier scripted three-task results are superseded and are not results for this live benchmark.
